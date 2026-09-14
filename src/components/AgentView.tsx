@@ -29,7 +29,7 @@ export function sanitizeHtml(html: string): string {
   return cleaned;
 }
 
-export function getCardinalDirection(district: string, feederName?: string): 'North' | 'East' | 'West' | 'South' | 'Sheger' {
+export function getCardinalDirection(district: string, feederName?: string): 'North' | 'East' | 'West' | 'South' | 'Sheger Region' {
   const d = district.toLowerCase();
   const f = (feederName || '').toUpperCase();
 
@@ -57,7 +57,7 @@ export function getCardinalDirection(district: string, feederName?: string): 'No
     f.includes('SUL-02') || f.includes('SUL-03') || f.includes('SUL-04') || f.includes('SUL-05') || f.includes('SUL-06') ||
     d.includes('sheger') || d.includes('finfinne') || d.includes('ፊንፊኔ') || d.includes('ፊዙዲ')
   ) {
-    return 'Sheger';
+    return 'Sheger Region';
   }
 
   // West list
@@ -114,7 +114,7 @@ export function getCardinalDirection(district: string, feederName?: string): 'No
   if (d.includes('west') || f.includes('WEST')) return 'West';
   if (d.includes('south') || f.includes('SOUTH')) return 'South';
 
-  return 'Sheger'; 
+  return 'Sheger Region'; 
 }
 
 export function EarthFaultIcon({ className }: { className?: string }) {

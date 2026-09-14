@@ -11,6 +11,7 @@ import {
   query, 
   orderBy,
   limit,
+  where,
   disableNetwork
 } from 'firebase/firestore';
 import { db } from './firebase';
@@ -177,9 +178,15 @@ export async function seedInitialDataIfEmpty() {
 /**
  * Subscribes to interruptions updates in real-time.
  */
-export function subscribeToInterruptions(onUpdate: (items: FeederInterruption[]) => void) {
+export function subscribeToInterruptions(onUpdate: (items: FeederInterruption[]) => void, onlyActive: boolean = false) {
   try {
-    return onSnapshot(interruptionsCol, (snapshot) => {
+    let q;
+    if (onlyActive) {
+      q = query(interruptionsCol, where('status', '==', InterruptionStatus.ACTIVE), limit(50));
+    } else {
+      q = query(interruptionsCol);
+    }
+    return onSnapshot(q, (snapshot) => {
       const list: FeederInterruption[] = [];
       snapshot.forEach((doc) => {
         const data = doc.data();

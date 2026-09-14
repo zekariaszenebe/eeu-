@@ -9,7 +9,7 @@ import { INITIAL_DISTRICTS, INITIAL_FEEDERS_LIST } from '../data/mockData';
 import { InterruptionTypeBadge, getCardinalDirection } from './AgentView';
 import { LanguageMode, translateAmharicLocation, formatLocationDisplay } from '../utils/locationLanguage';
 
-export const DIRECTIONS = ['North', 'East', 'West', 'South', 'Sheger'];
+export const DIRECTIONS = ['North', 'East', 'West', 'South', 'Sheger Region'];
 
 // Helper to parse feeder name and its Amharic location details
 const parseFeeder = (feederStr: string) => {
@@ -908,10 +908,10 @@ export default function AdminPanel({
                         <div className="text-[11px] text-[#101828] dark:text-gray-300 flex items-center gap-1 font-semibold">
                           <MapPin className="w-3 h-3 text-gray-400" />
                           <span>
-                            {item.direction ? (item.direction === 'Sheger' ? 'Sheger Region' : `${item.direction} Addis Ababa`) : 
+                            {item.direction ? (item.direction === 'Sheger Region' ? item.direction : `${item.direction} Addis Ababa`) : 
                               (() => {
                                 const dir = getCardinalDirection(item.district, item.feederName);
-                                return dir === 'Sheger' ? 'Sheger Region' : `${dir} Addis Ababa`;
+                                return dir === 'Sheger Region' ? dir : `${dir} Addis Ababa`;
                               })()}
                           </span>
                         </div>
@@ -1326,7 +1326,7 @@ export default function AdminPanel({
                 </div>
               )}
 
-              {/* Feeder selector or custom builder */}
+              {/* Feeder selector and Region */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase font-mono tracking-wider mb-1.5">
@@ -1449,6 +1449,7 @@ export default function AdminPanel({
 
                                     // Auto fill Affected Communities / Areas
                                     setAffectedArea(parsed.amharicLocation);
+                                    setDirection(parsed.direction || getCardinalDirection(district, parsed.feederLine));
                                   }}
                                   className={`w-full text-left px-3.5 py-2 text-xs transition-colors flex items-center justify-between gap-2 ${
                                     isSelected
@@ -1504,35 +1505,19 @@ export default function AdminPanel({
                 </div>
 
                 <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase font-mono tracking-wider">
-                      Administrative Team Leader
-                    </label>
-                  </div>
-                  {isTeamLeader || userRole === 'team_leader' ? (
-                    <select
-                      id="form-district-select"
-                      value={currentTeamLeader?.district || district || 'Team D'}
-                      disabled
-                      aria-readonly="true"
-                      className="w-full text-xs rounded-xl glass-input p-2.5 text-gray-900 dark:text-white font-semibold cursor-not-allowed opacity-90"
-                    >
-                      <option value={currentTeamLeader?.district || district || 'Team D'}>
-                        {currentTeamLeader?.district || district || 'Team D'} {currentTeamLeader?.name ? `— ${currentTeamLeader.name}` : ''}
-                      </option>
-                    </select>
-                  ) : (
-                    <select
-                      id="form-district-select"
-                      value={district}
-                      onChange={(e) => setDistrict(e.target.value)}
-                      className="w-full text-xs rounded-xl glass-input p-2.5 text-gray-900 dark:text-white focus:outline-none focus:ring-1.5 focus:ring-eeu-green"
-                    >
-                      {INITIAL_DISTRICTS.map((dist) => (
-                        <option key={dist} value={dist}>{dist}</option>
-                      ))}
-                    </select>
-                  )}
+                  <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase font-mono tracking-wider mb-1.5">
+                    Region
+                  </label>
+                  <select
+                    id="form-direction-select"
+                    value={direction}
+                    onChange={(e) => setDirection(e.target.value)}
+                    className="w-full text-xs rounded-xl glass-input p-2.5 text-gray-900 dark:text-white focus:outline-none focus:ring-1.5 focus:ring-eeu-green"
+                  >
+                    {DIRECTIONS.map((dir) => (
+                      <option key={dir} value={dir}>{dir === 'Sheger Region' ? dir : `${dir} Addis Ababa`}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
@@ -1569,22 +1554,6 @@ export default function AdminPanel({
                     ))}
                   </select>
                 </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase font-mono tracking-wider mb-1.5">
-                  Cardinal Direction / Region
-                </label>
-                <select
-                  id="form-direction-select"
-                  value={direction}
-                  onChange={(e) => setDirection(e.target.value)}
-                  className="w-full text-xs rounded-xl glass-input p-2.5 text-gray-900 dark:text-white focus:outline-none focus:ring-1.5 focus:ring-eeu-green"
-                >
-                  {DIRECTIONS.map((dir) => (
-                    <option key={dir} value={dir}>{dir} Addis Ababa</option>
-                  ))}
-                </select>
               </div>
 
               {/* Timing */}

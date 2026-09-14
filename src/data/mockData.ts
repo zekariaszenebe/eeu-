@@ -219,16 +219,16 @@ export const INITIAL_CUSTOMER_CONTACTS: ContactItem[] = [
   { id: 'cc-4', name: 'East Region Office', phone: '011-667-5875', category: 'head_regional', locationInfo: 'Kotebe Bireta Biret' },
   { id: 'cc-5', name: 'West Region Office', phone: '011-552-0231', category: 'head_regional', locationInfo: 'Fit Ber to Kazanchis turn' },
 
-  // Sheger City
-  { id: 'cc-6', name: 'Burayu', phone: '011-284-0614', category: 'sheger_city', locationInfo: 'Sheger City Burayu area branch' },
-  { id: 'cc-7', name: 'Alemgena', phone: '011-338-1314', category: 'sheger_city', locationInfo: 'Sheger City Alemgena branch' },
-  { id: 'cc-8', name: 'Welete', phone: '011-380-5250', category: 'sheger_city', locationInfo: 'Sheger City Welete branch' },
-  { id: 'cc-9', name: 'Bishoftu 1', phone: '011-433-3181', category: 'sheger_city', locationInfo: 'Sheger City Bishoftu main line (Alternative lines: 011-433-8773 / 011-433-8075)' },
-  { id: 'cc-10', name: 'Bishoftu 2', phone: '011-432-0335', category: 'sheger_city', locationInfo: 'Sheger City Bishoftu secondary branch' },
-  { id: 'cc-11', name: 'Legatafo', phone: '011-218-0099', category: 'sheger_city', locationInfo: 'Sheger City Legatafo branch' },
-  { id: 'cc-12', name: 'Sululta', phone: '011-161-7960', category: 'sheger_city', locationInfo: 'Sheger City Sululta branch' },
-  { id: 'cc-13', name: 'Holeta', phone: '011-261-0345', category: 'sheger_city', locationInfo: 'Sheger City Holeta branch' },
-  { id: 'cc-14', name: 'Sandafa', phone: '011-686-0564', category: 'sheger_city', locationInfo: 'Sheger City Sandafa branch' },
+  // Sheger Region
+  { id: 'cc-6', name: 'Burayu', phone: '011-284-0614', category: 'sheger_city', locationInfo: 'Sheger Region Burayu area branch' },
+  { id: 'cc-7', name: 'Alemgena', phone: '011-338-1314', category: 'sheger_city', locationInfo: 'Sheger Region Alemgena branch' },
+  { id: 'cc-8', name: 'Welete', phone: '011-380-5250', category: 'sheger_city', locationInfo: 'Sheger Region Welete branch' },
+  { id: 'cc-9', name: 'Bishoftu 1', phone: '011-433-3181', category: 'sheger_city', locationInfo: 'Sheger Region Bishoftu main line (Alternative lines: 011-433-8773 / 011-433-8075)' },
+  { id: 'cc-10', name: 'Bishoftu 2', phone: '011-432-0335', category: 'sheger_city', locationInfo: 'Sheger Region Bishoftu secondary branch' },
+  { id: 'cc-11', name: 'Legatafo', phone: '011-218-0099', category: 'sheger_city', locationInfo: 'Sheger Region Legatafo branch' },
+  { id: 'cc-12', name: 'Sululta', phone: '011-161-7960', category: 'sheger_city', locationInfo: 'Sheger Region Sululta branch' },
+  { id: 'cc-13', name: 'Holeta', phone: '011-261-0345', category: 'sheger_city', locationInfo: 'Sheger Region Holeta branch' },
+  { id: 'cc-14', name: 'Sandafa', phone: '011-686-0564', category: 'sheger_city', locationInfo: 'Sheger Region Sandafa branch' },
 
   // Regional hotlines
   { id: 'cc-15', name: 'Harari Region Support', phone: '025-666-0044', category: 'regional_hotline', locationInfo: 'Harari Regional office', hotlineShortCode: '9466' },

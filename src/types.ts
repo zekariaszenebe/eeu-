@@ -18,11 +18,11 @@ export interface FeederInterruption {
   id: string;
   feederName: string;
   district: string;
-  direction: 'North' | 'East' | 'West' | 'South' | 'Sheger';
+  direction?: 'North' | 'East' | 'West' | 'South' | 'Sheger Region';
   type: InterruptionType;
   status: InterruptionStatus;
-  startTime: string; // ISO string or simple time format
-  estimatedRestorationTime: string; // Simple time or ISO string
+  startTime: string;
+  estimatedRestorationTime: string;
   affectedArea: string;
   remark: string;
   lastUpdated: string;

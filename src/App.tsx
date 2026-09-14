@@ -181,6 +181,7 @@ export default function App() {
     let unsubNotes = () => {};
     let unsubCustomerContacts = () => {};
     let unsubTeamLeaders = () => {};
+    let unsub = () => {};
 
     seedInitialDataIfEmpty().then(() => {
       unsubNotifications = subscribeToNotifications((items) => {
@@ -205,6 +206,22 @@ export default function App() {
       unsubTeamLeaders = subscribeToTeamLeaders((items) => {
         setTeamLeaders(items);
       });
+      unsub = subscribeToInterruptions((items) => {
+        // Only trigger update if length or items are modified
+        setInterruptions(prev => {
+          const serializedPrev = JSON.stringify(prev);
+          const serializedNext = JSON.stringify(items);
+          if (serializedPrev === serializedNext) return prev;
+          
+          try {
+            localStorage.setItem('eeu-interruptions', serializedNext);
+          } catch (e) {
+            console.error('Failed to write Firestore updates to localStorage', e);
+          }
+          // channel?.postMessage({ type: 'SYNC_INTERRUPTIONS', data: items }); // Optional: only if broadcast channel is needed
+          return items;
+        });
+      }, userRole === 'agent');
     });
 
     return () => {
@@ -214,8 +231,9 @@ export default function App() {
       unsubNotes();
       unsubCustomerContacts();
       unsubTeamLeaders();
+      unsub();
     };
-  }, []);
+  }, [userRole]);
 
   useEffect(() => {
     document.documentElement.classList.remove('dark');
@@ -548,13 +566,15 @@ export default function App() {
               SMS Ticket Generator
             </button>
 
-            <button
-              id="mob-nav-history"
-              onClick={() => { setCurrentTab('history'); setMobileMenuOpen(false); }}
-              className={`w-full p-2.5 rounded-lg text-xs font-semibold flex items-center gap-2 ${currentTab === 'history' ? 'bg-eeu-green text-white' : 'text-gray-600 dark:text-gray-400'}`}
-            >
-              Restored Feeders
-            </button>
+            {(isAdmin || userRole === 'team_leader') && (
+              <button
+                id="mob-nav-history"
+                onClick={() => { setCurrentTab('history'); setMobileMenuOpen(false); }}
+                className={`w-full p-2.5 rounded-lg text-xs font-semibold flex items-center gap-2 ${currentTab === 'history' ? 'bg-eeu-green text-white' : 'text-gray-600 dark:text-gray-400'}`}
+              >
+                Restored Feeders
+              </button>
+            )}
 
             <button
               id="mob-nav-calculator"
