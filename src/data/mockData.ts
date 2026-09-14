@@ -1,4 +1,4 @@
-import { FeederInterruption, InterruptionType, InterruptionStatus, SystemNotification, ContactItem } from '../types';
+import { FeederInterruption, InterruptionType, InterruptionStatus, ContactItem } from '../types';
 import { INITIAL_FEEDERS_LIST } from './feedersList';
 
 export { INITIAL_FEEDERS_LIST };
@@ -178,36 +178,6 @@ export const INITIAL_INTERRUPTIONS: FeederInterruption[] = [
     affectedArea: 'ሰበታ ከተማ ሙሉ ፤ አለምገና ፤ ዋላያ ፤ አዋሽ መልካሳ መገንጠያ እና የኢንዱስትሪ ዞኑ በሙሉ',
     remark: 'Total blackout across regional 132kV grid interconnect. National dispatch center coordinating black-start step recovery.',
     lastUpdated: getPastHoursString(0.1)
-  }
-];
-
-export const INITIAL_NOTIFICATIONS: SystemNotification[] = [
-  {
-    id: 'n-2',
-    feederId: 'f-1',
-    type: 'new',
-    title: 'Active Fault: ADDIS CENTER ADC-15',
-    message: 'Breaker trip reporting phase imbalance at Legihar train station. Line patrol crew dispatched immediately.',
-    timestamp: getPastHoursString(1.5),
-    read: false
-  },
-  {
-    id: 'n-3',
-    feederId: 'f-6',
-    type: 'resolve',
-    title: 'Feeder Line Restored',
-    message: 'MEKANISA MEK-02 re-energized after replacing wet insulation gaskets. Voltage levels normal.',
-    timestamp: getPastHoursString(0.5),
-    read: false
-  },
-  {
-    id: 'n-4',
-    feederId: 'f-5',
-    type: 'update',
-    title: 'Bole / Weregenu Work Commenced',
-    message: 'Authorized Weregenu substation downtime scheduled in Bole Edna Mall Sector.',
-    timestamp: getPastHoursString(1),
-    read: true
   }
 ];
 

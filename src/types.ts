@@ -28,16 +28,6 @@ export interface FeederInterruption {
   lastUpdated: string;
 }
 
-export interface SystemNotification {
-  id: string;
-  feederId?: string;
-  type: 'new' | 'update' | 'resolve' | 'system';
-  title: string;
-  message: string;
-  timestamp: string;
-  read: boolean;
-}
-
 export interface SystemStats {
   totalActive: number;
   earthFaultCount: number;

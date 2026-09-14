@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Zap, Bell, Menu, X, ShieldAlert, CheckCircle2, AlertTriangle, 
+  Zap, Menu, X, ShieldAlert, CheckCircle2, AlertTriangle, 
   Settings, RefreshCw, Layers, LayoutGrid, Clock, LogOut, Sun, Moon,
   Headset, ShieldCheck, UserCheck, KeyRound, Eye, EyeOff, MessageCircle 
 } from 'lucide-react';
@@ -9,22 +9,18 @@ import {
 import { useInterruptions } from './context/InterruptionContext';
 
 // Types and mock data
-import { FeederInterruption, InterruptionType, InterruptionStatus, SystemNotification, TeamLeaderNote, ContactItem, TeamLeaderUser, UserRole } from './types';
-import { INITIAL_INTERRUPTIONS, INITIAL_NOTIFICATIONS, INITIAL_DISTRICTS, INITIAL_FEEDERS_LIST } from './data/mockData';
+import { FeederInterruption, InterruptionType, InterruptionStatus, TeamLeaderNote, ContactItem, TeamLeaderUser, UserRole } from './types';
+import { INITIAL_INTERRUPTIONS, INITIAL_DISTRICTS, INITIAL_FEEDERS_LIST } from './data/mockData';
 import { FEEDERS_VERSION } from './data/feedersList';
 
 // Firestore Services
 import { 
   seedInitialDataIfEmpty,
   subscribeToInterruptions,
-  subscribeToNotifications,
   subscribeToFeedersList,
   addInterruptionDoc,
   updateInterruptionDoc,
   deleteInterruptionDoc,
-  markAllNotificationsAsReadDoc,
-  markOneNotificationAsReadDoc,
-  clearAllNotificationsDoc,
   addPresetFeederDoc,
   deletePresetFeederDoc,
   resetAllPresetFeedersToMaster,
@@ -51,7 +47,6 @@ import Sidebar from './components/Sidebar';
 import StatsGrid from './components/StatsGrid';
 import AgentView from './components/AgentView';
 import AdminPanel from './components/AdminPanel';
-import NotificationCenter from './components/NotificationCenter';
 import ResolutionArchive from './components/ResolutionArchive';
 import BillCalculator from './components/BillCalculator';
 import SmartMeterCalculator from './components/SmartMeterCalculator';
@@ -84,31 +79,6 @@ export default function App() {
     liveToast,
     setLiveToast
   } = useInterruptions();
-
-  const [notifications, setNotifications] = useState<SystemNotification[]>(() => {
-    const saved = localStorage.getItem('eeu-notifications');
-    let loaded: SystemNotification[] = [];
-    if (saved) {
-      try {
-        loaded = JSON.parse(saved);
-      } catch (e) {
-        console.error('Failed to load notifications from localStorage', e);
-      }
-    }
-    // Deep deduplication safeguard and filtering of Emergency Diagnostics Launched & legacy mocks
-    const seen = new Set<string>();
-    const legacyNotifIds = new Set(['n-2', 'n-3', 'n-4']);
-    return loaded.filter((item) => {
-      if (!item || !item.id || seen.has(item.id) || legacyNotifIds.has(item.id)) {
-        return false;
-      }
-      if (item.title === 'Emergency Diagnostics Launched') {
-        return false;
-      }
-      seen.add(item.id);
-      return true;
-    });
-  });
 
   const [feedersList, setFeedersList] = useState<string[]>(() => {
     const saved = localStorage.getItem('eeu-feeders-list-v4');
@@ -175,7 +145,6 @@ export default function App() {
 
   // Seed initial data if needed and subscribe to Firestore updates in real-time
   useEffect(() => {
-    let unsubNotifications = () => {};
     let unsubFeeders = () => {};
     let unsubHubRecords = () => {};
     let unsubNotes = () => {};
@@ -184,11 +153,6 @@ export default function App() {
     let unsub = () => {};
 
     seedInitialDataIfEmpty().then(() => {
-      unsubNotifications = subscribeToNotifications((items) => {
-        const filtered = items.filter(item => item && item.title !== 'Emergency Diagnostics Launched');
-        setNotifications(filtered);
-        localStorage.setItem('eeu-notifications', JSON.stringify(filtered));
-      });
       unsubFeeders = subscribeToFeedersList((items) => {
         setFeedersList(items);
         localStorage.setItem('eeu-feeders-version', FEEDERS_VERSION);
@@ -225,7 +189,6 @@ export default function App() {
     });
 
     return () => {
-      unsubNotifications();
       unsubFeeders();
       unsubHubRecords();
       unsubNotes();
@@ -251,33 +214,6 @@ export default function App() {
       return true;
     }
     return false;
-  };
-
-  // Notifications operational state
-  const handleMarkAllAsRead = async () => {
-    try {
-      await markAllNotificationsAsReadDoc();
-      triggerToast('All Read', 'Cleared unread notification counter badge', 'success');
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const handleMarkOneAsRead = async (id: string) => {
-    try {
-      await markOneNotificationAsReadDoc(id);
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const handleClearAllNotifications = async () => {
-    try {
-      await clearAllNotificationsDoc();
-      triggerToast('Logs Cleared', 'Empty notification feed registry', 'info');
-    } catch (e) {
-      console.error(e);
-    }
   };
 
   // Syncing feeders list updates to Firestore
@@ -474,9 +410,6 @@ export default function App() {
     setCurrentTab('dashboard');
   };
 
-  // Aggregate stats
-  const activeUnreadCount = notifications.filter(n => !n.read).length;
-
   if (!isWebLoggedIn) {
     return (
       <WebLoginScreen
@@ -501,18 +434,6 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Notification Indicator badge */}
-            <button
-              id="mobile-tab-noti-toggle"
-              onClick={() => setCurrentTab('notifications')}
-              className="p-2 text-gray-400 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-900 rounded-lg relative"
-            >
-              <Bell className="w-4.5 h-4.5" />
-              {activeUnreadCount > 0 && (
-                <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-red-500 animate-ping" />
-              )}
-            </button>
-
             {/* Mobile Hamburger menu */}
             <button
               id="mobile-menu-hamburger"
@@ -546,17 +467,6 @@ export default function App() {
                 Feeder Admin Panel
               </button>
             )}
-
-            <button
-              id="mob-nav-notifications"
-              onClick={() => { setCurrentTab('notifications'); setMobileMenuOpen(false); }}
-              className={`w-full p-2.5 rounded-lg text-xs font-semibold flex items-center justify-between ${currentTab === 'notifications' ? 'bg-eeu-green text-white' : 'text-gray-600 dark:text-gray-400'}`}
-            >
-              <span>Incident Feeds</span>
-              {activeUnreadCount > 0 && (
-                <span className="py-0.5 px-2 text-[10px] bg-red-500 rounded-full text-white font-bold">{activeUnreadCount}</span>
-              )}
-            </button>
 
             <button
               id="mob-nav-sms-ticker"
@@ -655,7 +565,6 @@ export default function App() {
             onLogoutWeb={handleLogoutWeb}
             isDarkMode={isDarkMode}
             toggleTheme={toggleTheme}
-            notificationCount={activeUnreadCount}
             isMinimized={isSidebarMinimized}
             onToggleMinimize={toggleSidebarMinimize}
           />
@@ -691,21 +600,6 @@ export default function App() {
                   <span>Feedback</span>
                 </button>
 
-                {/* Notifications Button */}
-                <button
-                  id="header-notification-toggle"
-                  onClick={() => setCurrentTab('notifications')}
-                  title="Notifications"
-                  className="relative w-10 h-10 rounded-full bg-white dark:bg-gray-900 border border-gray-200/80 dark:border-gray-800 shadow-sm hover:shadow flex items-center justify-center text-slate-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all cursor-pointer shrink-0"
-                >
-                  <Bell className="w-4.5 h-4.5 text-slate-700 dark:text-slate-200" />
-                  {activeUnreadCount > 0 && (
-                    <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center shadow-xs">
-                      {activeUnreadCount > 9 ? '9+' : activeUnreadCount}
-                    </span>
-                  )}
-                </button>
-
                 {/* User Profile Pill Card */}
                 <div id="user-profile-pill" className="flex items-center gap-2.5 p-1.5 pr-4 pl-2 glass-card rounded-full shadow-sm border border-solid border-gray-250/70 dark:border-gray-800 select-none w-[175px] text-left">
                   <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${
@@ -730,7 +624,7 @@ export default function App() {
             </div>
 
             {/* LIVE DATA STATISTICS ROW */}
-            {currentTab !== 'hub' && currentTab !== 'admin' && currentTab !== 'notifications' && currentTab !== 'history' && currentTab !== 'contacts' && currentTab !== 'calculator' && currentTab !== 'smartmeter' && currentTab !== 'tariff' && currentTab !== 'sms-ticker' && <StatsGrid interruptions={interruptions} />}
+            {currentTab !== 'hub' && currentTab !== 'admin' && currentTab !== 'history' && currentTab !== 'contacts' && currentTab !== 'calculator' && currentTab !== 'smartmeter' && currentTab !== 'tariff' && currentTab !== 'sms-ticker' && <StatsGrid interruptions={interruptions} />}
 
             {/* DETAILED VIEWS CONTAINER */}
             <div id="active-tab-container" className="pt-2 animate-in fade-in-40 duration-200">
@@ -768,16 +662,6 @@ export default function App() {
 
               {currentTab === 'sms-ticker' && (
                 <SMSTickerGenerator />
-              )}
-
-              {currentTab === 'notifications' && (
-                <NotificationCenter
-                  notifications={notifications}
-                  onMarkAllAsRead={handleMarkAllAsRead}
-                  onMarkOneAsRead={handleMarkOneAsRead}
-                  onClearAllNotifications={handleClearAllNotifications}
-                  interruptions={interruptions}
-                />
               )}
 
               {currentTab === 'history' && (

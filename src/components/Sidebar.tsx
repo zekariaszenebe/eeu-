@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, ShieldAlert, Bell, History, Zap, User, AlertTriangle, ChevronLeft, ChevronRight, LogOut, MapPin, Phone, Calculator, Gauge, Headset, ShieldCheck, UserCheck, FileSpreadsheet, MessageSquare } from 'lucide-react';
+import { LayoutDashboard, ShieldAlert, History, Zap, User, AlertTriangle, ChevronLeft, ChevronRight, LogOut, MapPin, Phone, Calculator, Gauge, Headset, ShieldCheck, UserCheck, FileSpreadsheet, MessageSquare } from 'lucide-react';
 import EEULogo from './EEULogo';
 import { UserRole, TeamLeaderUser } from '../types';
 
@@ -14,7 +14,6 @@ interface SidebarProps {
   onLogoutWeb: () => void;
   isDarkMode?: boolean;
   toggleTheme?: () => void;
-  notificationCount: number;
   isMinimized: boolean;
   onToggleMinimize: () => void;
 }
@@ -30,7 +29,6 @@ export default function Sidebar({
   onLogoutWeb,
   isDarkMode,
   toggleTheme,
-  notificationCount,
   isMinimized,
   onToggleMinimize
 }: SidebarProps) {

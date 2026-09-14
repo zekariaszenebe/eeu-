@@ -15,8 +15,8 @@ import {
   disableNetwork
 } from 'firebase/firestore';
 import { db } from './firebase';
-import { FeederInterruption, SystemNotification, InterruptionStatus, InterruptionType, TeamLeaderNote, ContactItem, TeamLeaderUser } from '../types';
-import { INITIAL_INTERRUPTIONS, INITIAL_NOTIFICATIONS, INITIAL_FEEDERS_LIST, INITIAL_CUSTOMER_CONTACTS } from '../data/mockData';
+import { FeederInterruption, InterruptionStatus, InterruptionType, TeamLeaderNote, ContactItem, TeamLeaderUser } from '../types';
+import { INITIAL_INTERRUPTIONS, INITIAL_FEEDERS_LIST, INITIAL_CUSTOMER_CONTACTS } from '../data/mockData';
 import { FEEDERS_VERSION } from '../data/feedersList';
 import { HubRecord, HUB_RECORDS } from '../data/hubData';
 
@@ -83,7 +83,6 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
 
 // Firestore collection references
 const interruptionsCol = collection(db, 'interruptions');
-const notificationsCol = collection(db, 'notifications');
 const presetFeedersCol = collection(db, 'presetFeeders');
 const hubRecordsCol = collection(db, 'hubRecords');
 const teamLeaderNotesCol = collection(db, 'teamLeaderNotes');
@@ -223,43 +222,6 @@ export function subscribeToInterruptions(onUpdate: (items: FeederInterruption[])
   }
 }
 
-/**
- * Subscribes to system notifications updates in real-time.
- */
-export function subscribeToNotifications(onUpdate: (items: SystemNotification[]) => void) {
-  try {
-    return onSnapshot(notificationsCol, (snapshot) => {
-      const list: SystemNotification[] = [];
-      snapshot.forEach((doc) => {
-        const data = doc.data();
-        list.push({
-          id: data.id || doc.id,
-          feederId: data.feederId,
-          type: data.type,
-          title: data.title,
-          message: data.message,
-          timestamp: data.timestamp,
-          read: data.read
-        } as SystemNotification);
-      });
-      
-      const sorted = [...list].sort((a, b) => (b.timestamp || '').localeCompare(a.timestamp || ''));
-      onUpdate(sorted);
-    }, (err) => {
-      handleFirestoreError(err, OperationType.GET, 'notifications');
-      const cached = getLocal<SystemNotification[]>('eeu-notifications', []);
-      onUpdate(cached);
-    });
-  } catch {
-    const cached = getLocal<SystemNotification[]>('eeu-notifications', []);
-    onUpdate(cached);
-    return () => {};
-  }
-}
-
-/**
- * Subscribes to preset feeders list in real-time.
- */
 export function subscribeToFeedersList(onUpdate: (items: string[]) => void) {
   try {
     return onSnapshot(presetFeedersCol, (snapshot) => {
@@ -353,29 +315,6 @@ export async function addInterruptionDoc(entry: Omit<FeederInterruption, 'id' | 
     }
   }
 
-  const notiId = `n-${Date.now()}-${suffix}`;
-  const newNoti: SystemNotification = {
-    id: notiId,
-    feederId: newId,
-    type: 'new',
-    title: `New Feeder Added`,
-    message: `${entry.feederName} (${entry.district}) logged under ${entry.status}. Affected areas: ${entry.affectedArea}`,
-    timestamp: timestampStr,
-    read: false
-  };
-
-  // Local storage notification
-  const localNotifs = getLocal<SystemNotification[]>('eeu-notifications', []);
-  setLocal('eeu-notifications', [newNoti, ...localNotifs]);
-
-  if (!isFirestoreQuotaExhausted()) {
-    try {
-      await setDoc(doc(db, 'notifications', notiId), newNoti);
-    } catch (error) {
-      handleFirestoreError(error, OperationType.CREATE, `notifications/${notiId}`);
-    }
-  }
-
   return record;
 }
 
@@ -428,37 +367,6 @@ export async function updateInterruptionDoc(id: string, entry: Partial<FeederInt
       handleFirestoreError(error, OperationType.UPDATE, `interruptions/${id}`);
     }
   }
-
-  // Add companion notification if status changed
-  if (entry.status && safeExisting.status && entry.status !== safeExisting.status) {
-    const typeVal: 'resolve' | 'update' = entry.status === InterruptionStatus.RESTORED ? 'resolve' : 'update';
-    const titleText = entry.status === InterruptionStatus.RESTORED ? 'Feeder Line Restored' : 'Operational Status Changed';
-    const messageText = entry.status === InterruptionStatus.RESTORED 
-      ? `${merged.feederName} restored to active grid status and re-energized successfully.`
-      : `${merged.feederName} reassessed as ${entry.status}. Details: ${entry.remark || merged.remark}`;
-
-    const notiId = `n-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
-    const changeNoti: SystemNotification = {
-      id: notiId,
-      feederId: id,
-      type: typeVal,
-      title: titleText,
-      message: messageText,
-      timestamp: timestampStr,
-      read: false
-    };
-
-    const localNotifs = getLocal<SystemNotification[]>('eeu-notifications', []);
-    setLocal('eeu-notifications', [changeNoti, ...localNotifs]);
-
-    if (!isFirestoreQuotaExhausted()) {
-      try {
-        await setDoc(doc(db, 'notifications', notiId), changeNoti);
-      } catch (error) {
-        handleFirestoreError(error, OperationType.CREATE, `notifications/${notiId}`);
-      }
-    }
-  }
 }
 
 /**
@@ -474,62 +382,6 @@ export async function deleteInterruptionDoc(id: string) {
     } catch (error) {
       handleFirestoreError(error, OperationType.DELETE, `interruptions/${id}`);
     }
-  }
-}
-
-/**
- * Marks all notifications as read.
- */
-export async function markAllNotificationsAsReadDoc() {
-  const localNotifs = getLocal<SystemNotification[]>('eeu-notifications', []);
-  setLocal('eeu-notifications', localNotifs.map(n => ({ ...n, read: true })));
-
-
-  try {
-    const snapshot = await getDocs(notificationsCol);
-    const batch = writeBatch(db);
-    snapshot.forEach((doc) => {
-      if (!doc.data().read) {
-        batch.update(doc.ref, { read: true });
-      }
-    });
-    await batch.commit();
-  } catch (error) {
-    handleFirestoreError(error, OperationType.WRITE, 'notifications');
-  }
-}
-
-/**
- * Marks a single notification as read.
- */
-export async function markOneNotificationAsReadDoc(id: string) {
-  const localNotifs = getLocal<SystemNotification[]>('eeu-notifications', []);
-  setLocal('eeu-notifications', localNotifs.map(n => n.id === id ? { ...n, read: true } : n));
-
-
-  try {
-    await updateDoc(doc(db, 'notifications', id), { read: true });
-  } catch (error) {
-    handleFirestoreError(error, OperationType.UPDATE, `notifications/${id}`);
-  }
-}
-
-/**
- * Clears all system notifications.
- */
-export async function clearAllNotificationsDoc() {
-  setLocal('eeu-notifications', []);
-
-
-  try {
-    const snapshot = await getDocs(notificationsCol);
-    const batch = writeBatch(db);
-    snapshot.forEach((doc) => {
-      batch.delete(doc.ref);
-    });
-    await batch.commit();
-  } catch (error) {
-    handleFirestoreError(error, OperationType.DELETE, 'notifications');
   }
 }
 
