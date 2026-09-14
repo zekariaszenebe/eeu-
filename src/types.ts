@@ -18,6 +18,7 @@ export interface FeederInterruption {
   id: string;
   feederName: string;
   district: string;
+  direction: 'North' | 'East' | 'West' | 'South' | 'Sheger';
   type: InterruptionType;
   status: InterruptionStatus;
   startTime: string; // ISO string or simple time format

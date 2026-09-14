@@ -9,23 +9,29 @@ import { INITIAL_DISTRICTS, INITIAL_FEEDERS_LIST } from '../data/mockData';
 import { InterruptionTypeBadge, getCardinalDirection } from './AgentView';
 import { LanguageMode, translateAmharicLocation, formatLocationDisplay } from '../utils/locationLanguage';
 
+export const DIRECTIONS = ['North', 'East', 'West', 'South', 'Sheger'];
+
 // Helper to parse feeder name and its Amharic location details
 const parseFeeder = (feederStr: string) => {
   try {
-    if (!feederStr) return { feederLine: '', amharicLocation: '' };
-    const parenIndex = feederStr.indexOf('(');
+    if (!feederStr) return { feederLine: '', amharicLocation: '', direction: '' };
+    const parts = feederStr.split('|').map(s => s.trim());
+    const mainPart = parts[0];
+    const direction = parts[1] || '';
+    
+    const parenIndex = mainPart.indexOf('(');
     if (parenIndex !== -1) {
-      const feederLine = feederStr.substring(0, parenIndex).trim();
-      const closeIndex = feederStr.lastIndexOf(')');
+      const feederLine = mainPart.substring(0, parenIndex).trim();
+      const closeIndex = mainPart.lastIndexOf(')');
       const amharicLocation = closeIndex !== -1 
-        ? feederStr.substring(parenIndex + 1, closeIndex).trim() 
-        : feederStr.substring(parenIndex + 1).trim();
-      return { feederLine, amharicLocation };
+        ? mainPart.substring(parenIndex + 1, closeIndex).trim() 
+        : mainPart.substring(parenIndex + 1).trim();
+      return { feederLine, amharicLocation, direction };
     }
-    return { feederLine: feederStr, amharicLocation: '' };
+    return { feederLine: mainPart, amharicLocation: '', direction };
   } catch (err) {
     console.error('Failed to parse feeder string:', feederStr, err);
-    return { feederLine: feederStr || '', amharicLocation: '' };
+    return { feederLine: feederStr || '', amharicLocation: '', direction: '' };
   }
 };
 
@@ -128,6 +134,7 @@ export default function AdminPanel({
   const [startTime, setStartTime] = useState('');
   const [estimatedRestoration, setEstimatedRestoration] = useState('');
   const [affectedArea, setAffectedArea] = useState('');
+  const [direction, setDirection] = useState<string>(DIRECTIONS[0]);
   const [remark, setRemark] = useState('');
 
   // Form message feedback
@@ -141,6 +148,7 @@ export default function AdminPanel({
   const [feederFormSubstation, setFeederFormSubstation] = useState('');
   const [feederFormCode, setFeederFormCode] = useState('');
   const [feederFormArea, setFeederFormArea] = useState('');
+  const [feederFormDirection, setFeederFormDirection] = useState(DIRECTIONS[0]);
   const [feederFormError, setFeederFormError] = useState('');
   const [csvCopied, setCsvCopied] = useState(false);
 
@@ -247,11 +255,11 @@ export default function AdminPanel({
     setCustomFeederName('');
 
     // Default district based on role: team leaders are locked to their assigned team (e.g. Team D for Zekarias Zenebe)
-    if (isTeamLeader || userRole === 'team_leader') {
-      setDistrict(currentTeamLeader?.district || 'Team D');
-    } else {
-      setDistrict(INITIAL_DISTRICTS[0]);
-    }
+    const initialDistrict = (isTeamLeader || userRole === 'team_leader')
+      ? (currentTeamLeader?.district || 'Team D')
+      : INITIAL_DISTRICTS[0];
+    setDistrict(initialDistrict);
+    setDirection(getCardinalDirection(initialDistrict, ''));
 
     setType(InterruptionType.EARTH_FAULT);
     setStatus(InterruptionStatus.ACTIVE);
@@ -307,6 +315,7 @@ export default function AdminPanel({
     }
     
     setDistrict(item.district);
+    setDirection(item.direction || getCardinalDirection(item.district, item.feederName));
     setType(item.type);
     setStatus(item.status);
     setStartTime(item.startTime);
@@ -323,6 +332,7 @@ export default function AdminPanel({
     setFeederFormSubstation('');
     setFeederFormCode('');
     setFeederFormArea('');
+    setFeederFormDirection(DIRECTIONS[0]);
     setFeederFormError('');
     setShowFeederModal(true);
   };
@@ -331,11 +341,16 @@ export default function AdminPanel({
     const globalIdx = activeFeeders.findIndex(f => f === feederStr);
     setEditingFeederIdx(globalIdx !== -1 ? globalIdx : index);
     
-    const { feederLine, amharicLocation } = parseFeeder(feederStr);
+    const { feederLine, amharicLocation, direction } = parseFeeder(feederStr);
     const { substation, feederId } = parseFeederDetails(feederLine);
     setFeederFormSubstation(substation);
     setFeederFormCode(feederId);
     setFeederFormArea(amharicLocation);
+    
+    // Auto-detect direction if not present in string
+    const finalDirection = direction || getCardinalDirection(substation, feederId);
+    setFeederFormDirection(finalDirection || DIRECTIONS[0]);
+    
     setFeederFormError('');
     setShowFeederModal(true);
   };
@@ -353,9 +368,7 @@ export default function AdminPanel({
 
     const fullFeederLine = `${feederFormSubstation.trim()} - ${feederFormCode.trim()}`;
 
-    const combined = feederFormArea.trim() 
-      ? `${fullFeederLine} (${feederFormArea.trim()})`
-      : fullFeederLine;
+    const combined = `${fullFeederLine}${feederFormArea.trim() ? ` (${feederFormArea.trim()})` : ''} | ${feederFormDirection}`;
 
     const newList = [...activeFeeders];
     
@@ -366,7 +379,7 @@ export default function AdminPanel({
 
       newList[editingFeederIdx] = combined;
 
-      // Automatically cascade edit: Rename feeder line and update associated community areas across all interruption records!
+      // Automatically cascade edit: Rename feeder line and update associated community areas and direction across all interruption records!
       const normOldLine = normalizeFeederName(oldParsed.feederLine);
       const normOldStr = normalizeFeederName(oldFeederStr);
 
@@ -384,6 +397,9 @@ export default function AdminPanel({
           }
           if (newParsed.amharicLocation && (item.affectedArea === oldParsed.amharicLocation || !item.affectedArea || oldParsed.amharicLocation !== newParsed.amharicLocation)) {
             updates.affectedArea = newParsed.amharicLocation;
+          }
+          if (newParsed.direction && item.direction !== newParsed.direction) {
+            updates.direction = newParsed.direction as any;
           }
           if (Object.keys(updates).length > 0) {
             onUpdateInterruption(item.id, updates);
@@ -471,6 +487,7 @@ export default function AdminPanel({
     const payload = {
       feederName: finalFeederName,
       district: finalDistrict,
+      direction: direction,
       type,
       status,
       startTime,
@@ -853,7 +870,8 @@ export default function AdminPanel({
               <thead>
                 <tr className="border-b border-gray-100 dark:border-gray-800 text-[11px] font-sans font-bold text-gray-500 dark:text-gray-400 uppercase bg-gray-50/30 dark:bg-gray-950/10">
                   <th className="py-3.5 px-5 font-sans">Feeder Station Details</th>
-                  <th className="py-3.5 px-5 font-sans">Type / Region</th>
+                  <th className="py-3.5 px-5 font-sans">Type</th>
+                  <th className="py-3.5 px-5 font-sans">Direction</th>
                   <th className="py-3.5 px-5 font-sans">Operational Status</th>
                   <th className="py-3.5 px-5 font-sans">Affected Location Area</th>
                   <th className="py-3.5 px-5 text-right font-sans">ACTIONS</th>
@@ -882,16 +900,19 @@ export default function AdminPanel({
 
                       {/* Outage Type */}
                       <td className="py-4 px-5">
-                        <div className="pb-1.5">
-                          <InterruptionTypeBadge type={item.type} />
-                        </div>
-                        <div className="text-[11px] text-gray-500 dark:text-gray-400 flex items-center gap-1 mt-0.5">
+                        <InterruptionTypeBadge type={item.type} />
+                      </td>
+
+                      {/* Cardinal Direction */}
+                      <td className="py-4 px-5">
+                        <div className="text-[11px] text-[#101828] dark:text-gray-300 flex items-center gap-1 font-semibold">
                           <MapPin className="w-3 h-3 text-gray-400" />
                           <span>
-                            {(() => {
-                              const dir = getCardinalDirection(item.district, item.feederName);
-                              return dir === 'Sheger' ? 'Sheger Region' : `${dir} Addis Ababa`;
-                            })()}
+                            {item.direction ? (item.direction === 'Sheger' ? 'Sheger Region' : `${item.direction} Addis Ababa`) : 
+                              (() => {
+                                const dir = getCardinalDirection(item.district, item.feederName);
+                                return dir === 'Sheger' ? 'Sheger Region' : `${dir} Addis Ababa`;
+                              })()}
                           </span>
                         </div>
                       </td>
@@ -1059,6 +1080,7 @@ export default function AdminPanel({
                 <thead>
                   <tr className="border-b border-gray-100 dark:border-gray-800 text-[11px] font-sans font-bold text-gray-500 dark:text-gray-400 uppercase bg-gray-50/30 dark:bg-gray-950/10">
                     <th className="py-3.5 px-5 w-1/5 font-sans">Feeder Name</th>
+                    <th className="py-3.5 px-5 font-sans">Direction</th>
                     <th className="py-3.5 px-5 w-1/5 font-sans">Feeder Number</th>
                     <th className="py-3.5 px-5 font-sans">
                       <div className="flex items-center justify-between">
@@ -1073,7 +1095,7 @@ export default function AdminPanel({
                 </thead>
                 <tbody className="divide-y divide-gray-100 dark:divide-gray-800/60 text-sm">
                   {filteredFeeders.map((feederStr, index) => {
-                    const { feederLine, amharicLocation } = parseFeeder(feederStr);
+                    const { feederLine, amharicLocation, direction } = parseFeeder(feederStr);
                     const { substation, feederId } = parseFeederDetails(feederLine);
                     const englishLocation = translateAmharicLocation(amharicLocation);
                     return (
@@ -1087,6 +1109,14 @@ export default function AdminPanel({
                             <Building className="w-3.5 h-3.5 text-blue-500 fill-blue-500/10 shrink-0" />
                             <span>{substation}</span>
                           </div>
+                        </td>
+
+                        {/* Cardinal Direction */}
+                        <td className="py-4 px-5 text-xs text-gray-600 dark:text-gray-400 font-semibold">
+                          {(() => {
+                            const dir = direction || getCardinalDirection(substation, feederId);
+                            return dir === 'Sheger' ? 'Sheger Region' : `${dir} Addis Ababa`;
+                          })()}
                         </td>
 
                         {/* Identifier */}
@@ -1109,7 +1139,8 @@ export default function AdminPanel({
                             <div className="text-xs text-gray-800 dark:text-gray-200 text-left leading-relaxed">
                               {amharicLocation}
                             </div>
-                          )}
+                          )
+                          }
                         </td>
 
                         {/* Actions */}
@@ -1540,6 +1571,22 @@ export default function AdminPanel({
                 </div>
               </div>
 
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase font-mono tracking-wider mb-1.5">
+                  Cardinal Direction / Region
+                </label>
+                <select
+                  id="form-direction-select"
+                  value={direction}
+                  onChange={(e) => setDirection(e.target.value)}
+                  className="w-full text-xs rounded-xl glass-input p-2.5 text-gray-900 dark:text-white focus:outline-none focus:ring-1.5 focus:ring-eeu-green"
+                >
+                  {DIRECTIONS.map((dir) => (
+                    <option key={dir} value={dir}>{dir} Addis Ababa</option>
+                  ))}
+                </select>
+              </div>
+
               {/* Timing */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className={(
@@ -1712,6 +1759,22 @@ export default function AdminPanel({
                     className="w-full text-xs rounded-xl glass-input px-3.5 py-2 text-gray-900 dark:text-white focus:outline-none focus:ring-1.5 focus:ring-eeu-green text-left font-semibold"
                   />
                 </div>
+              </div>
+
+              {/* Cardinal Direction */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase font-mono tracking-wider mb-1.5">
+                  Cardinal Direction / Region
+                </label>
+                <select
+                  value={feederFormDirection}
+                  onChange={(e) => setFeederFormDirection(e.target.value)}
+                  className="w-full text-xs rounded-xl glass-input p-2.5 text-gray-900 dark:text-white focus:outline-none focus:ring-1.5 focus:ring-eeu-green"
+                >
+                  {DIRECTIONS.map((dir) => (
+                    <option key={dir} value={dir}>{dir} Addis Ababa</option>
+                  ))}
+                </select>
               </div>
 
               {/* Default communities field */}
