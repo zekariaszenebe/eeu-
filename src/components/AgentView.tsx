@@ -64,7 +64,6 @@ export function getCardinalDirection(district: string, feederName?: string): 'No
   if (
     fUpper.includes('GEF-') || // GEF-01 to GEF-21
     fUpper.includes('LEG-12') ||
-    fUpper.includes('ANF-06') ||
     fUpper.includes('SEB-II-') || // SEB-II-1 to SEB-II-15
     fUpper.includes('SHG-04') || fUpper.includes('SHG-8') ||
     fUpper.includes('SUL-02') || fUpper.includes('SUL-03') || fUpper.includes('SUL-04') || fUpper.includes('SUL-05') || fUpper.includes('SUL-06') ||
