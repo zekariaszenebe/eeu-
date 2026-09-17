@@ -1148,7 +1148,7 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
           {(() => {
             const directionsToRender = selectedDirection !== 'All' 
               ? [selectedDirection] 
-              : (['North', 'East', 'West', 'South', 'Sheger'] as const);
+              : (['North', 'East', 'West', 'South', 'Sheger Region'] as const);
 
             const renderDirHeader = (dir: string, count: number) => {
               let amStyle = "text-sky-600 bg-sky-500/10 dark:text-sky-400";
@@ -1176,7 +1176,7 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
                   <div className="flex items-center gap-2.5">
                     <div>
                       <h3 className="font-display font-black text-gray-900 dark:text-white text-xl tracking-tight flex items-center gap-2">
-                        {dir === 'Sheger' ? 'Sheger Region' : `${dir} Addis Ababa`}
+                        {dir === 'Sheger Region' ? 'Sheger Region' : `${dir} Addis Ababa`}
                       </h3>
                     </div>
                   </div>
@@ -1340,11 +1340,6 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
                                       }`} />
                                       {item.status}
                                     </span>
-                                    {dir === 'Sheger Region' && (
-                                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-purple-500/10 text-purple-600 dark:bg-purple-900/20 dark:text-purple-400">
-                                        Sheger Region
-                                      </span>
-                                    )}
                                   </div>
                                 </div>
 
