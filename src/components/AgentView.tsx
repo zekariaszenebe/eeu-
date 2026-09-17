@@ -1323,22 +1323,29 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
                                 {/* Card top bar */}
                                 <div className="flex items-start justify-between gap-3">
                                   {/* Operational badge */}
-                                  <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                                    item.status === InterruptionStatus.ACTIVE
-                                      ? 'bg-red-500/10 text-red-655 dark:bg-red-955/20 dark:text-red-400'
-                                      : item.status === InterruptionStatus.UNDER_INVESTIGATION
-                                      ? 'bg-amber-500/10 text-amber-655 dark:bg-amber-955/20 dark:text-amber-400'
-                                      : 'bg-eeu-green/10 text-eeu-green'
-                                  }`}>
-                                    <span className={`w-1.5 h-1.5 rounded-full ${
+                                  <div className="flex items-center gap-2">
+                                    <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
                                       item.status === InterruptionStatus.ACTIVE
-                                        ? 'bg-red-500 animate-pulse'
+                                        ? 'bg-red-500/10 text-red-655 dark:bg-red-955/20 dark:text-red-400'
                                         : item.status === InterruptionStatus.UNDER_INVESTIGATION
-                                        ? 'bg-amber-500'
-                                        : 'bg-eeu-green'
-                                    }`} />
-                                    {item.status}
-                                  </span>
+                                        ? 'bg-amber-500/10 text-amber-655 dark:bg-amber-955/20 dark:text-amber-400'
+                                        : 'bg-eeu-green/10 text-eeu-green'
+                                    }`}>
+                                      <span className={`w-1.5 h-1.5 rounded-full ${
+                                        item.status === InterruptionStatus.ACTIVE
+                                          ? 'bg-red-500 animate-pulse'
+                                          : item.status === InterruptionStatus.UNDER_INVESTIGATION
+                                          ? 'bg-amber-500'
+                                          : 'bg-eeu-green'
+                                      }`} />
+                                      {item.status}
+                                    </span>
+                                    {dir === 'Sheger Region' && (
+                                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-purple-500/10 text-purple-600 dark:bg-purple-900/20 dark:text-purple-400">
+                                        Sheger Region
+                                      </span>
+                                    )}
+                                  </div>
                                 </div>
 
                                 {/* Feeder Name */}
