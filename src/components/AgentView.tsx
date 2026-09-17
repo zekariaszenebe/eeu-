@@ -815,12 +815,12 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
   });
 
   // Compute direction statistics based on all current active interruptions
-  const directionStats = {
+  const directionStats: Record<string, { active: number, restored: number, total: number, areas: string[] }> = {
     North: { active: 0, restored: 0, total: 0, areas: [] as string[] },
     East: { active: 0, restored: 0, total: 0, areas: [] as string[] },
     West: { active: 0, restored: 0, total: 0, areas: [] as string[] },
     South: { active: 0, restored: 0, total: 0, areas: [] as string[] },
-    Sheger: { active: 0, restored: 0, total: 0, areas: [] as string[] },
+    'Sheger Region': { active: 0, restored: 0, total: 0, areas: [] as string[] },
   };
 
   displayInterruptions.forEach((item) => {
