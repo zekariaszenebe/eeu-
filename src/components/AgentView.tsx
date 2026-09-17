@@ -30,31 +30,44 @@ export function sanitizeHtml(html: string): string {
 }
 
 export function getCardinalDirection(district: string, feederName?: string): 'North' | 'East' | 'West' | 'South' | 'Sheger Region' {
+  const f = (feederName || '');
+  
+  // Try to parse from feeder name if it contains '|'
+  if (f.includes('|')) {
+    const parts = f.split('|').map(s => s.trim());
+    if (parts.length >= 2) {
+       const direction = parts[1];
+       if (['North', 'East', 'West', 'South', 'Sheger Region'].includes(direction)) {
+         return direction as 'North' | 'East' | 'West' | 'South' | 'Sheger Region';
+       }
+    }
+  }
+
   const d = district.toLowerCase();
-  const f = (feederName || '').toUpperCase();
+  const fUpper = f.toUpperCase();
 
   // North list
   if (
-    f.includes('ADE-08') ||
-    f.includes('ADG-04') || f.includes('ADG-3') ||
-    f.includes('ADN-01') || f.includes('ADN-02') || f.includes('ADN-03') || f.includes('ADN-04') || f.includes('ADN-06') ||
-    f.includes('ADW-02') ||
-    f.includes('BEL-01') || f.includes('BEL-03') || f.includes('BEL-05') || f.includes('BEL-06') ||
-    f.includes('BLL-02') || f.includes('BLL-14') ||
-    f.includes('SHG-01') || f.includes('SHG-02') || f.includes('SHG-05') || f.includes('SHG-06') || f.includes('SHG-07') || f.includes('SHG-09') || f.includes('SHG-10') ||
-    f.includes('SUL-01')
+    fUpper.includes('ADE-08') ||
+    fUpper.includes('ADG-04') || fUpper.includes('ADG-3') ||
+    fUpper.includes('ADN-01') || fUpper.includes('ADN-02') || fUpper.includes('ADN-03') || fUpper.includes('ADN-04') || fUpper.includes('ADN-06') ||
+    fUpper.includes('ADW-02') ||
+    fUpper.includes('BEL-01') || fUpper.includes('BEL-03') || fUpper.includes('BEL-05') || fUpper.includes('BEL-06') ||
+    fUpper.includes('BLL-02') || fUpper.includes('BLL-14') ||
+    fUpper.includes('SHG-01') || fUpper.includes('SHG-02') || fUpper.includes('SHG-05') || fUpper.includes('SHG-06') || fUpper.includes('SHG-07') || fUpper.includes('SHG-09') || fUpper.includes('SHG-10') ||
+    fUpper.includes('SUL-01')
   ) {
     return 'North';
   }
 
   // Sheger list (remove central and add sheger, matches ፊንፊኔ ዙሪያ/ፊዙዲ)
   if (
-    f.includes('GEF-') || // GEF-01 to GEF-21
-    f.includes('LEG-12') ||
-    f.includes('ANF-06') ||
-    f.includes('SEB-II-') || // SEB-II-1 to SEB-II-15
-    f.includes('SHG-04') || f.includes('SHG-8') ||
-    f.includes('SUL-02') || f.includes('SUL-03') || f.includes('SUL-04') || f.includes('SUL-05') || f.includes('SUL-06') ||
+    fUpper.includes('GEF-') || // GEF-01 to GEF-21
+    fUpper.includes('LEG-12') ||
+    fUpper.includes('ANF-06') ||
+    fUpper.includes('SEB-II-') || // SEB-II-1 to SEB-II-15
+    fUpper.includes('SHG-04') || fUpper.includes('SHG-8') ||
+    fUpper.includes('SUL-02') || fUpper.includes('SUL-03') || fUpper.includes('SUL-04') || fUpper.includes('SUL-05') || fUpper.includes('SUL-06') ||
     d.includes('sheger') || d.includes('finfinne') || d.includes('ፊንፊኔ') || d.includes('ፊዙዲ')
   ) {
     return 'Sheger Region';
