@@ -1170,6 +1170,7 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
             onClick={() => {
               setSelectedDistrict('All');
               setSelectedDirection('All');
+              setSelectedType('All');
               setLocationSearchQuery('');
             }}
             className="px-6 py-2.5 bg-eeu-green text-white rounded-xl font-semibold hover:bg-eeu-green/90 transition-colors"
