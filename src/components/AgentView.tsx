@@ -6,7 +6,7 @@ import {
   Columns, Rows, Zap, Settings, Compass, ArrowUp, ArrowDown, ArrowLeft, ArrowRight,
   Trash2, Edit3, Plus, MessageSquare, AlertCircle, Languages,
   Undo, Redo, Bold, Italic, Underline, Strikethrough, AlignLeft, AlignCenter, AlignRight, AlignJustify, Table, ChevronDown,
-  Activity, Gauge, PowerOff
+  Activity, Gauge, PowerOff, Server
 } from 'lucide-react';
 import { FeederInterruption, InterruptionType, InterruptionStatus, stripBrackets, TeamLeaderNote } from '../types';
 import { INITIAL_DISTRICTS } from '../data/mockData';
@@ -192,6 +192,18 @@ export function getTypeBadgeStyles(type: InterruptionType) {
         bg: 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 border-indigo-200/50 dark:border-indigo-950/30',
         icon: Settings,
         colorClass: 'text-indigo-500'
+      };
+    case InterruptionType.SHEDDING:
+      return {
+        bg: 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-200/50 dark:border-rose-950/30',
+        icon: AlertTriangle,
+        colorClass: 'text-rose-500'
+      };
+    case InterruptionType.LDC:
+      return {
+        bg: 'bg-teal-500/10 text-teal-700 dark:text-teal-400 border-teal-200/50 dark:border-teal-950/30',
+        icon: Server,
+        colorClass: 'text-teal-500'
       };
     default:
       return {
@@ -891,7 +903,7 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
                 <option value="East">East Addis Ababa</option>
                 <option value="West">West Addis Ababa</option>
                 <option value="South">South Addis Ababa</option>
-                <option value="Sheger">Sheger Region</option>
+                <option value="Sheger Region">Sheger Region</option>
               </select>
             </div>
 
@@ -1151,9 +1163,19 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
         {sortedItems.length === 0 ? (
         <div id="no-results-panel" className="glass-card rounded-3xl p-12 text-center">
           <AlertTriangle className="w-12 h-12 text-amber-500 mx-auto mb-4" />
-          <h3 className="text-base font-display font-semibold text-gray-900 dark:text-white">
+          <h3 className="text-base font-display font-semibold text-gray-900 dark:text-white mb-4">
             No Outage Records
           </h3>
+          <button 
+            onClick={() => {
+              setSelectedDistrict('All');
+              setSelectedDirection('All');
+              setLocationSearchQuery('');
+            }}
+            className="px-6 py-2.5 bg-eeu-green text-white rounded-xl font-semibold hover:bg-eeu-green/90 transition-colors"
+          >
+            Reset All Filters
+          </button>
         </div>
       ) : (
         <>
@@ -1446,7 +1468,7 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
                           <React.Fragment key={`table-dir-group-${dir}`}>
                             <tr className="bg-gray-100/50 dark:bg-gray-950/40 font-bold">
                               <td colSpan={5} className="py-3 px-5 text-xs text-gray-900 dark:text-gray-100 font-sans uppercase">
-                                ⚡ {dir === 'Sheger' ? 'SHEGER REGION' : `${dir.toUpperCase()} ADDIS ABABA`} SECTOR OUTAGES ({itemsInDir.length})
+                                ⚡ {dir === 'Sheger Region' ? 'SHEGER REGION' : `${dir.toUpperCase()} ADDIS ABABA`} SECTOR OUTAGES ({itemsInDir.length})
                               </td>
                             </tr>
                             {itemsInDir.map((item) => {
