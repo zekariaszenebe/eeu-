@@ -108,8 +108,10 @@ export default function AdminPanel({
   const [loginError, setLoginError] = useState(false);
 
   // Dynamic Base Feeder entries
+  const canEditFeeders = isAdmin || userRole === 'admin';
   const activeFeeders = feedersList || INITIAL_FEEDERS_LIST;
   const handleUpdateFeeders = (newList: string[]) => {
+    if (!canEditFeeders) return;
     if (onUpdateFeedersList) {
       onUpdateFeedersList(newList);
     }
@@ -328,6 +330,7 @@ export default function AdminPanel({
 
   // Master Feeder List handlers
   const handleOpenAddFeeder = () => {
+    if (!canEditFeeders) return;
     setEditingFeederIdx(null);
     setFeederFormSubstation('');
     setFeederFormCode('');
@@ -338,6 +341,7 @@ export default function AdminPanel({
   };
 
   const handleOpenEditFeeder = (feederStr: string, index: number) => {
+    if (!canEditFeeders) return;
     const globalIdx = activeFeeders.findIndex(f => f === feederStr);
     setEditingFeederIdx(globalIdx !== -1 ? globalIdx : index);
     
@@ -357,6 +361,10 @@ export default function AdminPanel({
 
   const handleFeederFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canEditFeeders) {
+      setFeederFormError('Only administrators can modify the Preset Feeder Line Records Database.');
+      return;
+    }
     if (!feederFormSubstation.trim()) {
       setFeederFormError('Please enter Substation Details.');
       return;
@@ -421,6 +429,7 @@ export default function AdminPanel({
   };
 
   const handleDeleteFeeder = (feederStr: string) => {
+    if (!canEditFeeders) return;
     const newList = activeFeeders.filter((f) => f !== feederStr);
     handleUpdateFeeders(newList);
   };
@@ -760,7 +769,7 @@ export default function AdminPanel({
             </button>
           ) : adminSubTab === 'feeders' ? (
             <div className="flex items-center gap-2">
-              {onResetMasterFeeders && (
+              {canEditFeeders && onResetMasterFeeders && (
                 <button
                   id="admin-preset-reset-btn"
                   onClick={() => {
@@ -775,14 +784,21 @@ export default function AdminPanel({
                   <span>Sync Master Database ({INITIAL_FEEDERS_LIST.length})</span>
                 </button>
               )}
-              <button
-                id="admin-preset-add-btn"
-                onClick={handleOpenAddFeeder}
-                className="px-4 py-2.5 bg-eeu-green hover:bg-eeu-green-hover active:scale-[0.98] text-white rounded-xl text-xs font-semibold flex items-center gap-2 transition-all shadow-lg shadow-eeu-green/20 hover:shadow-eeu-green/30 cursor-pointer focus:outline-none focus:ring-2 focus:ring-eeu-green focus:ring-offset-2 dark:focus:ring-offset-gray-900"
-              >
-                <Plus className="w-4 h-4" />
-                <span>Add Feeder Preset</span>
-              </button>
+              {canEditFeeders ? (
+                <button
+                  id="admin-preset-add-btn"
+                  onClick={handleOpenAddFeeder}
+                  className="px-4 py-2.5 bg-eeu-green hover:bg-eeu-green-hover active:scale-[0.98] text-white rounded-xl text-xs font-semibold flex items-center gap-2 transition-all shadow-lg shadow-eeu-green/20 hover:shadow-eeu-green/30 cursor-pointer focus:outline-none focus:ring-2 focus:ring-eeu-green focus:ring-offset-2 dark:focus:ring-offset-gray-900"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Add Feeder Preset</span>
+                </button>
+              ) : (
+                <div className="flex items-center gap-1.5 px-3 py-2 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs font-semibold text-amber-700 dark:text-amber-400">
+                  <Lock className="w-3.5 h-3.5" />
+                  <span>Read-Only (Admin Edit Only)</span>
+                </div>
+              )}
             </div>
           ) : (
             <button
@@ -1011,12 +1027,21 @@ export default function AdminPanel({
                 <h3 className="font-display font-semibold text-xs text-gray-600 dark:text-gray-400 uppercase tracking-wider">
                   Preset Feeder Line Records Database ({activeFeeders.length})
                 </h3>
-                <span className="text-[10px] font-mono font-bold text-emerald-650 bg-emerald-500/10 dark:bg-emerald-950/30 px-2 py-0.5 rounded border border-emerald-500/25 animate-pulse">
-                  Admin: Write Access Active
-                </span>
+                {canEditFeeders ? (
+                  <span className="text-[10px] font-mono font-bold text-emerald-650 bg-emerald-500/10 dark:bg-emerald-950/30 px-2 py-0.5 rounded border border-emerald-500/25 animate-pulse">
+                    Admin: Write Access Active
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-mono font-semibold text-amber-700 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/25 flex items-center gap-1">
+                    <Lock className="w-3 h-3" />
+                    Read-Only (Admin Exclusive)
+                  </span>
+                )}
               </div>
               <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1">
-                Customize physical grid line naming templates and pre-populated community lists in both Amharic and English.
+                {canEditFeeders
+                  ? 'Customize physical grid line naming templates and pre-populated community lists in both Amharic and English.'
+                  : 'Preset Feeder Line Records Database is in read-only mode. Only administrators can add, edit, or delete preset feeder line records.'}
               </p>
             </div>
 
@@ -1090,7 +1115,9 @@ export default function AdminPanel({
                         </span>
                       </div>
                     </th>
-                    <th className="py-3.5 px-5 text-right w-28 font-sans">Actions</th>
+                    <th className="py-3.5 px-5 text-right w-28 font-sans">
+                      {canEditFeeders ? 'Actions' : 'Permission'}
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 dark:divide-gray-800/60 text-sm">
@@ -1143,33 +1170,42 @@ export default function AdminPanel({
                           }
                         </td>
 
-                        {/* Actions */}
+                        {/* Actions / Permission */}
                         <td className="py-4 px-5 text-right whitespace-nowrap">
-                          <div className="flex items-center justify-end gap-1.5">
-                            <button
-                              id={`feeder-edit-btn-${index}`}
-                              onClick={() => handleOpenEditFeeder(feederStr, index)}
-                              title="Edit Preset"
-                              className="p-2 text-blue-600 hover:bg-blue-500/10 dark:text-blue-400 rounded-lg transition-all cursor-pointer"
-                            >
-                              <Edit3 className="w-4 h-4" />
-                            </button>
-                            
-                            <button
-                              id={`feeder-delete-btn-${index}`}
-                              onClick={() => {
-                                setDeleteConfirm({
-                                  idOrStr: feederStr,
-                                  name: feederLine,
-                                  type: 'feeder'
-                                });
-                              }}
-                              title="Delete Area Preset"
-                              className="p-2 text-red-500 hover:bg-red-500/10 rounded-lg transition-all cursor-pointer"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
+                          {canEditFeeders ? (
+                            <div className="flex items-center justify-end gap-1.5">
+                              <button
+                                id={`feeder-edit-btn-${index}`}
+                                onClick={() => handleOpenEditFeeder(feederStr, index)}
+                                title="Edit Preset"
+                                className="p-2 text-blue-600 hover:bg-blue-500/10 dark:text-blue-400 rounded-lg transition-all cursor-pointer"
+                              >
+                                <Edit3 className="w-4 h-4" />
+                              </button>
+                              
+                              <button
+                                id={`feeder-delete-btn-${index}`}
+                                onClick={() => {
+                                  setDeleteConfirm({
+                                    idOrStr: feederStr,
+                                    name: feederLine,
+                                    type: 'feeder'
+                                  });
+                                }}
+                                title="Delete Area Preset"
+                                className="p-2 text-red-500 hover:bg-red-500/10 rounded-lg transition-all cursor-pointer"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center justify-end">
+                              <span className="inline-flex items-center gap-1 text-[11px] font-mono text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800/60 px-2 py-1 rounded border border-gray-200/50 dark:border-gray-700/50" title="Admin only edit permission">
+                                <Lock className="w-3 h-3 text-amber-600 dark:text-amber-400" />
+                                <span>Locked</span>
+                              </span>
+                            </div>
+                          )}
                         </td>
                       </tr>
                     );
@@ -1665,8 +1701,8 @@ export default function AdminPanel({
         </div>
       )}
 
-      {/* Preset Feeder Line Modal */}
-      {showFeederModal && (
+      {/* Preset Feeder Line Modal (Admin Only) */}
+      {showFeederModal && canEditFeeders && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
           <div className="glass-card rounded-3xl max-w-md w-full shadow-2xl animate-in fade-in zoom-in-95 duration-150 border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950">
             {/* Modal Header */}
@@ -1937,7 +1973,9 @@ export default function AdminPanel({
                   if (deleteConfirm.type === 'interruption') {
                     onDeleteInterruption(deleteConfirm.idOrStr);
                   } else if (deleteConfirm.type === 'feeder') {
-                    handleDeleteFeeder(deleteConfirm.idOrStr);
+                    if (canEditFeeders) {
+                      handleDeleteFeeder(deleteConfirm.idOrStr);
+                    }
                   } else if (deleteConfirm.type === 'team_leader' && onDeleteTeamLeader) {
                     onDeleteTeamLeader(deleteConfirm.idOrStr);
                   }

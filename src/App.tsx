@@ -216,8 +216,12 @@ export default function App() {
     return false;
   };
 
-  // Syncing feeders list updates to Firestore
+  // Syncing feeders list updates to Firestore (Admin Only)
   const handleUpdateFeedersList = async (newList: string[]) => {
+    if (!isAdmin && userRole !== 'admin') {
+      triggerToast('Access Denied', 'Only administrators can modify the Preset Feeder Line Records Database', 'warn');
+      return;
+    }
     try {
       const prevList = [...feedersList];
       setFeedersList(newList);
@@ -247,6 +251,10 @@ export default function App() {
   };
 
   const handleResetMasterFeeders = async () => {
+    if (!isAdmin && userRole !== 'admin') {
+      triggerToast('Access Denied', 'Only administrators can reset the Preset Feeder Line Records Database', 'warn');
+      return;
+    }
     try {
       localStorage.setItem('eeu-feeders-version', FEEDERS_VERSION);
       localStorage.setItem('eeu-feeders-list-v4', JSON.stringify(INITIAL_FEEDERS_LIST));
@@ -651,8 +659,8 @@ export default function App() {
                   onUpdateInterruption={handleUpdateInterruption}
                   onDeleteInterruption={handleDeleteInterruption}
                   feedersList={feedersList}
-                  onUpdateFeedersList={handleUpdateFeedersList}
-                  onResetMasterFeeders={handleResetMasterFeeders}
+                  onUpdateFeedersList={isAdmin || userRole === 'admin' ? handleUpdateFeedersList : undefined}
+                  onResetMasterFeeders={isAdmin || userRole === 'admin' ? handleResetMasterFeeders : undefined}
                   teamLeaders={teamLeaders}
                   onAddTeamLeader={handleAddTeamLeader}
                   onUpdateTeamLeader={handleUpdateTeamLeader}
