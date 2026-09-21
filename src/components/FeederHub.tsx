@@ -72,6 +72,7 @@ export function FeederHub({ isAdmin = false, hubRecords = HUB_RECORDS, onUpdateR
   const [sortAsc, setSortAsc] = useState(true);
   const [copiedBp, setCopiedBp] = useState<string | null>(null);
   const [copiedDispatcherId, setCopiedDispatcherId] = useState<string | null>(null);
+  const [copiedTlId, setCopiedTlId] = useState<string | null>(null);
 
   // Editing State
   const [editingRecord, setEditingRecord] = useState<HubRecord | null>(null);
@@ -94,6 +95,15 @@ export function FeederHub({ isAdmin = false, hubRecords = HUB_RECORDS, onUpdateR
       setCopiedDispatcherId(id);
       setTimeout(() => {
         setCopiedDispatcherId(null);
+      }, 2000);
+    });
+  };
+
+  const handleCopyTlId = (id: string) => {
+    navigator.clipboard.writeText(id).then(() => {
+      setCopiedTlId(id);
+      setTimeout(() => {
+        setCopiedTlId(null);
       }, 2000);
     });
   };
@@ -131,7 +141,7 @@ export function FeederHub({ isAdmin = false, hubRecords = HUB_RECORDS, onUpdateR
   };
 
   const handleDownloadCSV = () => {
-    const headers = ["No", "ADDRESS", "REGION", "CSC", "DUMMY BP", "RSG", "DISPATCHER NAME", "DISPATCHER ID", "CUSTOMER SERVICE TL ID", "OFFICE LOCATION"];
+    const headers = ["No", "ADDRESS", "REGION", "CSC", "DUMMY BP", "RSG", "DISPATCHER ID", "CUSTOMER SERVICE TL ID", "OFFICE LOCATION", "DISPATCHER NAME"];
     const sourceRecords = hubRecords.length > 0 ? hubRecords : HUB_RECORDS;
     const rows = sourceRecords.map(r => [
       r.no,
@@ -140,10 +150,10 @@ export function FeederHub({ isAdmin = false, hubRecords = HUB_RECORDS, onUpdateR
       r.csc,
       r.dummyBp,
       r.rsg,
-      `"${r.dispatcherName.replace(/"/g, '""')}"`,
       r.dispatcherId,
       r.customerServiceTlId,
-      `"${r.officeLocation.replace(/"/g, '""')}"`
+      `"${r.officeLocation.replace(/"/g, '""')}"`,
+      `"${r.dispatcherName.replace(/"/g, '""')}"`
     ]);
 
     const csvContent = "data:text/csv;charset=utf-8," 
@@ -159,7 +169,7 @@ export function FeederHub({ isAdmin = false, hubRecords = HUB_RECORDS, onUpdateR
   };
 
   const handleOpenInGoogleSheets = () => {
-    const headers = ["No", "ADDRESS", "REGION", "CSC", "DUMMY BP", "RSG", "DISPATCHER NAME", "DISPATCHER ID", "CUSTOMER SERVICE TL ID", "OFFICE LOCATION"];
+    const headers = ["No", "ADDRESS", "REGION", "CSC", "DUMMY BP", "RSG", "DISPATCHER ID", "CUSTOMER SERVICE TL ID", "OFFICE LOCATION", "DISPATCHER NAME"];
     const sourceRecords = hubRecords.length > 0 ? hubRecords : HUB_RECORDS;
     const rows = sourceRecords.map(r => [
       r.no,
@@ -168,10 +178,10 @@ export function FeederHub({ isAdmin = false, hubRecords = HUB_RECORDS, onUpdateR
       r.csc,
       r.dummyBp,
       r.rsg,
-      r.dispatcherName,
       r.dispatcherId,
       r.customerServiceTlId,
-      String(r.officeLocation ?? '').trim().replace(/[\r\n]+/g, ' ')
+      String(r.officeLocation ?? '').trim().replace(/[\r\n]+/g, ' '),
+      r.dispatcherName
     ]);
 
     // Format as Tab Separated Values for direct Google Sheets paste compatibility
@@ -332,11 +342,6 @@ export function FeederHub({ isAdmin = false, hubRecords = HUB_RECORDS, onUpdateR
                     <span>RSG Codes</span>
                   </div>
                 </th>
-                <th className="py-4 px-5 w-[330px] min-w-[330px]">
-                  <div className="flex items-center gap-1.5">
-                    <span>Office Location Landmark</span>
-                  </div>
-                </th>
                 <th className="py-4 px-5 w-36">
                   <div className="flex items-center gap-1.5">
                     <span>Dispatcher ID</span>
@@ -345,6 +350,11 @@ export function FeederHub({ isAdmin = false, hubRecords = HUB_RECORDS, onUpdateR
                 <th className="py-4 px-5 w-40">
                   <div className="flex items-center gap-1.5">
                     <span>CS TL ID</span>
+                  </div>
+                </th>
+                <th className="py-4 px-5 w-[330px] min-w-[330px]">
+                  <div className="flex items-center gap-1.5">
+                    <span>Office Location Landmark</span>
                   </div>
                 </th>
                 <th className="py-4 px-5 w-44">
@@ -432,14 +442,6 @@ export function FeederHub({ isAdmin = false, hubRecords = HUB_RECORDS, onUpdateR
                     {item.rsg}
                   </td>
 
-                  {/* Office Location Landmark */}
-                  <td className="py-3.5 px-5 text-gray-700 dark:text-gray-350 leading-relaxed font-medium w-[330px] min-w-[330px]">
-                    <div className="flex items-start gap-1.5 w-full">
-                      <Building className="w-3.5 h-3.5 text-gray-400 shrink-0 mt-0.5" />
-                      <span className="line-clamp-3 text-[11px]">{item.officeLocation}</span>
-                    </div>
-                  </td>
-
                   {/* Dispatcher ID */}
                   <td className="py-3.5 px-5 font-mono text-gray-600 dark:text-gray-400 w-36">
                     <div className="flex items-center gap-1.5 group">
@@ -462,7 +464,30 @@ export function FeederHub({ isAdmin = false, hubRecords = HUB_RECORDS, onUpdateR
 
                   {/* Customer Service TL ID */}
                   <td className="py-3.5 px-5 font-mono text-gray-600 dark:text-gray-400 w-40">
-                    {item.customerServiceTlId}
+                    <div className="flex items-center gap-1.5 group">
+                      <span>{item.customerServiceTlId}</span>
+                      {item.customerServiceTlId && item.customerServiceTlId !== '-' && item.customerServiceTlId !== 'N/A' && (
+                        <button
+                          onClick={() => handleCopyTlId(item.customerServiceTlId)}
+                          className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-all opacity-50 group-hover:opacity-100 cursor-pointer"
+                          title="Copy CS TL ID"
+                        >
+                          {copiedTlId === item.customerServiceTlId ? (
+                            <Check className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-450" />
+                          ) : (
+                            <Copy className="w-3 h-3" />
+                          )}
+                        </button>
+                      )}
+                    </div>
+                  </td>
+
+                  {/* Office Location Landmark */}
+                  <td className="py-3.5 px-5 text-gray-700 dark:text-gray-350 leading-relaxed font-medium w-[330px] min-w-[330px]">
+                    <div className="flex items-start gap-1.5 w-full">
+                      <Building className="w-3.5 h-3.5 text-gray-400 shrink-0 mt-0.5" />
+                      <span className="line-clamp-3 text-[11px]">{item.officeLocation}</span>
+                    </div>
                   </td>
 
                   {/* Dispatcher Name */}
