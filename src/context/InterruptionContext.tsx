@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { FeederInterruption, InterruptionStatus } from '../types';
+import { FeederInterruption, InterruptionStatus, normalizeInterruptionType } from '../types';
 import { 
   addInterruptionDoc, 
   updateInterruptionDoc, 
@@ -54,7 +54,10 @@ export const InterruptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
       }
       seen.add(item.id);
       return true;
-    });
+    }).map(item => ({
+      ...item,
+      type: normalizeInterruptionType(item.type)
+    }));
   });
 
   const [liveToast, setLiveToast] = useState<{ title: string; desc: string; type: 'info' | 'success' | 'warn' } | null>(null);
@@ -72,9 +75,13 @@ export const InterruptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     const handleMessage = (event: MessageEvent) => {
       const { type, data } = event.data || {};
       if (type === 'SYNC_INTERRUPTIONS' && Array.isArray(data)) {
-        setInterruptions(data);
+        const normalized = data.map((item: FeederInterruption) => ({
+          ...item,
+          type: normalizeInterruptionType(item.type)
+        }));
+        setInterruptions(normalized);
         try {
-          localStorage.setItem('eeu-interruptions', JSON.stringify(data));
+          localStorage.setItem('eeu-interruptions', JSON.stringify(normalized));
         } catch (e) {
           console.error('Failed to persist synced data to localStorage', e);
         }
@@ -93,7 +100,10 @@ export const InterruptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
         try {
           const parsed = JSON.parse(e.newValue);
           if (Array.isArray(parsed)) {
-            setInterruptions(parsed);
+            setInterruptions(parsed.map(item => ({
+              ...item,
+              type: normalizeInterruptionType(item.type)
+            })));
           }
         } catch (err) {
           console.error('Storage sync parsing error:', err);

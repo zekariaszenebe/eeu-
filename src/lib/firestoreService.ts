@@ -15,7 +15,7 @@ import {
   disableNetwork
 } from 'firebase/firestore';
 import { db } from './firebase';
-import { FeederInterruption, InterruptionStatus, InterruptionType, TeamLeaderNote, ContactItem, TeamLeaderUser } from '../types';
+import { FeederInterruption, InterruptionStatus, InterruptionType, normalizeInterruptionType, TeamLeaderNote, ContactItem, TeamLeaderUser } from '../types';
 import { INITIAL_INTERRUPTIONS, INITIAL_FEEDERS_LIST, INITIAL_CUSTOMER_CONTACTS } from '../data/mockData';
 import { FEEDERS_VERSION } from '../data/feedersList';
 import { HubRecord, HUB_RECORDS } from '../data/hubData';
@@ -193,7 +193,8 @@ export function subscribeToInterruptions(onUpdate: (items: FeederInterruption[])
           id: data.id || doc.id,
           feederName: data.feederName,
           district: data.district,
-          type: data.type,
+          direction: data.direction,
+          type: normalizeInterruptionType(data.type),
           status: data.status,
           startTime: data.startTime,
           estimatedRestorationTime: data.estimatedRestorationTime,
@@ -294,7 +295,8 @@ export async function addInterruptionDoc(entry: Omit<FeederInterruption, 'id' | 
     id: newId,
     feederName: entry.feederName || '',
     district: entry.district || 'Team A',
-    type: entry.type || InterruptionType.EARTH_FAULT,
+    direction: entry.direction,
+    type: normalizeInterruptionType(entry.type),
     status: entry.status || InterruptionStatus.ACTIVE,
     startTime: entry.startTime || timestampStr,
     estimatedRestorationTime: entry.estimatedRestorationTime || 'N/A',
@@ -347,7 +349,8 @@ export async function updateInterruptionDoc(id: string, entry: Partial<FeederInt
     id: id,
     feederName: entry.feederName ?? safeExisting.feederName ?? '',
     district: entry.district ?? safeExisting.district ?? 'Team A',
-    type: entry.type ?? safeExisting.type ?? InterruptionType.EARTH_FAULT,
+    direction: entry.direction ?? safeExisting.direction,
+    type: normalizeInterruptionType(entry.type ?? safeExisting.type),
     status: entry.status ?? safeExisting.status ?? InterruptionStatus.ACTIVE,
     startTime: entry.startTime ?? safeExisting.startTime ?? timestampStr,
     estimatedRestorationTime: entry.estimatedRestorationTime ?? safeExisting.estimatedRestorationTime ?? 'N/A',

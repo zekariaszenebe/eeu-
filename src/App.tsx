@@ -291,7 +291,8 @@ export default function App() {
       { t: InterruptionType.DIFFERENTIAL, r: 'Substation power transformer differential protection (87T) operated. Isolation in progress.' },
       { t: InterruptionType.OVER_CURRENT, r: 'Feeder breaker tripped on high overcurrent threshold (50/51). Crews surveying trunk line.' },
       { t: InterruptionType.TOTAL_BLACKOUT, r: 'Grid total blackout reported across incoming high-voltage transmission lines.' },
-      { t: InterruptionType.OPERATIONAL_INTERRUPTION, r: 'Replacing burnt overhead cables and tightening drop link lines.' }
+      { t: InterruptionType.OPERATIONAL_INTERRUPTION, r: 'Replacing burnt overhead cables and tightening drop link lines.' },
+      { t: InterruptionType.LDC, r: 'Load Dispatch Center (LDC) shedding directive under national control center balance plan.' }
     ];
     const pickedTypeObj = incidentTypes[Math.floor(Math.random() * incidentTypes.length)];
     

@@ -6,9 +6,9 @@ import {
   Columns, Rows, Zap, Settings, Compass, ArrowUp, ArrowDown, ArrowLeft, ArrowRight,
   Trash2, Edit3, Plus, MessageSquare, AlertCircle, Languages,
   Undo, Redo, Bold, Italic, Underline, Strikethrough, AlignLeft, AlignCenter, AlignRight, AlignJustify, Table, ChevronDown,
-  Activity, Gauge, PowerOff, Server
+  Activity, Gauge, PowerOff, Server, Share2, Copy, Check
 } from 'lucide-react';
-import { FeederInterruption, InterruptionType, InterruptionStatus, stripBrackets, TeamLeaderNote } from '../types';
+import { FeederInterruption, InterruptionType, InterruptionStatus, normalizeInterruptionType, stripBrackets, TeamLeaderNote } from '../types';
 import { INITIAL_DISTRICTS } from '../data/mockData';
 import { addTeamLeaderNoteDoc, updateTeamLeaderNoteDoc, deleteTeamLeaderNoteDoc, subscribeToInterruptions } from '../lib/firestoreService';
 import { LanguageMode, translateAmharicLocation, formatLocationDisplay } from '../utils/locationLanguage';
@@ -149,8 +149,9 @@ export function EarthFaultIcon({ className }: { className?: string }) {
   );
 }
 
-export function getTypeBadgeStyles(type: InterruptionType) {
-  switch (type) {
+export function getTypeBadgeStyles(type: InterruptionType | string) {
+  const normalized = normalizeInterruptionType(type);
+  switch (normalized) {
     case InterruptionType.EARTH_FAULT:
       return {
         bg: 'bg-red-500/10 text-red-700 dark:text-red-400 border-red-200/50 dark:border-red-950/40',
@@ -214,15 +215,57 @@ export function getTypeBadgeStyles(type: InterruptionType) {
   }
 }
 
-export function InterruptionTypeBadge({ type }: { type: InterruptionType }) {
-  const styles = getTypeBadgeStyles(type);
+export function InterruptionTypeBadge({ type }: { type: InterruptionType | string }) {
+  const normalized = normalizeInterruptionType(type);
+  const styles = getTypeBadgeStyles(normalized);
   const Icon = styles.icon;
+
+  let displayLabel: string = normalized;
+  if (typeof type === 'string') {
+    const upper = type.toUpperCase().trim();
+    if (upper === 'LCD' || upper === 'LDC') {
+      displayLabel = 'LDC';
+    }
+  }
+
   return (
     <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[11px] font-bold border ${styles.bg}`}>
       <Icon className={`w-3.5 h-3.5 ${styles.colorClass}`} />
-      <span>{type}</span>
+      <span>{displayLabel}</span>
     </span>
   );
+}
+
+export function formatInterruptionShareText(item: FeederInterruption, lang: LanguageMode = 'en'): string {
+  const normalizedType = normalizeInterruptionType(item.type);
+  let typeDisplay: string = normalizedType;
+  if (typeof item.type === 'string') {
+    const upper = item.type.toUpperCase().trim();
+    if (upper === 'LCD' || upper === 'LDC') {
+      typeDisplay = 'LDC';
+    }
+  }
+
+  const feeder = stripBrackets(item.feederName);
+  const areas = lang === 'en' ? translateAmharicLocation(item.affectedArea) : item.affectedArea;
+  const estTime = (!item.estimatedRestorationTime || item.estimatedRestorationTime === 'N/A')
+    ? 'Line patrol & inspection in progress (TBD)'
+    : item.estimatedRestorationTime;
+
+  return [
+    `⚡ EEU FEEDER INTERRUPTION BULLETIN`,
+    `━━━━━━━━━━━━━━━━━━━━━━━━━━`,
+    `📍 Feeder Station: ${feeder}`,
+    `⚠️ Interruption Type: ${typeDisplay}`,
+    `📊 Status: ${item.status}`,
+    `🕒 Start Time: ${item.startTime}`,
+    `⏳ Est. Restoration: ${estTime}`,
+    `🏘️ Affected Areas (${lang === 'en' ? 'English' : 'አማርኛ'}):`,
+    `${areas}`,
+    item.remark ? `📝 Dispatch Log: ${item.remark}` : '',
+    `━━━━━━━━━━━━━━━━━━━━━━━━━━`,
+    `Ethiopian Electric Utility (EEU) 24/7 Grid Operations`
+  ].filter(Boolean).join('\n');
 }
 
 interface AgentViewProps {
@@ -267,6 +310,39 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
 
   // View state (horizontal vs grid vs table)
   const [viewLayout, setViewLayout] = useState<'horizontal' | 'grid' | 'table'>('horizontal');
+
+  // Interruption Alert sharing state
+  const [copiedInterruptionId, setCopiedInterruptionId] = useState<string | null>(null);
+
+  const handleShareInterruption = async (item: FeederInterruption, e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation();
+    }
+    const text = formatInterruptionShareText(item, languageMode);
+    
+    // Attempt modern web share if supported on mobile/touch, else copy to clipboard
+    if (navigator.share && /mobile|android|iphone|ipad/i.test(navigator.userAgent)) {
+      try {
+        await navigator.share({
+          title: `EEU Interruption: ${stripBrackets(item.feederName)} (${normalizeInterruptionType(item.type)})`,
+          text: text
+        });
+        setCopiedInterruptionId(item.id);
+        setTimeout(() => setCopiedInterruptionId(null), 2500);
+        return;
+      } catch (err) {
+        // User cancelled or share dismissed, proceed to clipboard copy fallback
+      }
+    }
+
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedInterruptionId(item.id);
+      setTimeout(() => setCopiedInterruptionId(null), 2500);
+    } catch (err) {
+      console.error('Clipboard copy failed:', err);
+    }
+  };
 
   // Team Leader Notes state controls
   const [isAddingNote, setIsAddingNote] = useState(false);
@@ -736,8 +812,9 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
     // 2. District Filter Match
     const matchesDistrict = selectedDistrict === 'All' || item.district === selectedDistrict;
 
-    // 3. Type Filter Match
-    const matchesType = selectedType === 'All' || item.type === selectedType;
+    // 3. Type Filter Match (Normalized for Over Current, LDC, etc.)
+    const matchesType = selectedType === 'All' || 
+      normalizeInterruptionType(item.type) === normalizeInterruptionType(selectedType);
 
     // 4. Cardinal Direction Filter Match
     const itemDir = getCardinalDirection(item.district, item.feederName);
@@ -1308,17 +1385,43 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
                                       <span className="text-gray-400">Start Time:</span>
                                       <span className="text-gray-800 dark:text-gray-300">{item.startTime}</span>
                                     </div>
-                                    {item.type !== 'Earth Fault' && item.type !== 'Short Circuit' && (
+                                    {item.estimatedRestorationTime && item.estimatedRestorationTime !== 'N/A' ? (
                                       <div className="flex justify-between lg:justify-end gap-3">
                                         <span className="text-gray-400">Est. Restore:</span>
                                         <span className="text-eeu-green font-semibold">{item.estimatedRestorationTime}</span>
+                                      </div>
+                                    ) : (
+                                      <div className="flex justify-between lg:justify-end gap-3">
+                                        <span className="text-gray-400">Restoration:</span>
+                                        <span className="text-amber-500 font-medium text-[11px]">Patrol in progress</span>
                                       </div>
                                     )}
                                   </div>
                                 </div>
 
-                                <div className="text-[10px] text-gray-400 dark:text-gray-500 font-sans text-right flex flex-col justify-end leading-normal">
-                                  <span>Last Updated: {item.lastUpdated}</span>
+                                <div className="flex flex-col lg:items-end gap-2 pt-1">
+                                  <div className="text-[10px] text-gray-400 dark:text-gray-500 font-sans text-right flex flex-col justify-end leading-normal">
+                                    <span>Last Updated: {item.lastUpdated}</span>
+                                  </div>
+
+                                  <button
+                                    type="button"
+                                    onClick={(e) => handleShareInterruption(item, e)}
+                                    className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 transition-all shadow-2xs border border-gray-200 dark:border-gray-700 cursor-pointer"
+                                    title="Share or copy interruption bulletin with Type"
+                                  >
+                                    {copiedInterruptionId === item.id ? (
+                                      <>
+                                        <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                                        <span className="text-emerald-600 dark:text-emerald-400 font-bold">Copied with Type!</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Share2 className="w-3.5 h-3.5 text-gray-500 dark:text-gray-400" />
+                                        <span>Share Interruption</span>
+                                      </>
+                                    )}
+                                  </button>
                                 </div>
                               </div>
                             </div>
@@ -1376,6 +1479,25 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
                                       {item.status}
                                     </span>
                                   </div>
+
+                                  <button
+                                    type="button"
+                                    onClick={(e) => handleShareInterruption(item, e)}
+                                    className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium text-gray-600 dark:text-gray-300 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 transition-colors cursor-pointer border border-gray-200/60 dark:border-gray-700/60"
+                                    title="Share or copy interruption bulletin with Type"
+                                  >
+                                    {copiedInterruptionId === item.id ? (
+                                      <>
+                                        <Check className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+                                        <span className="text-emerald-600 dark:text-emerald-400 font-bold">Copied!</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Share2 className="w-3 h-3 text-gray-500" />
+                                        <span>Share</span>
+                                      </>
+                                    )}
+                                  </button>
                                 </div>
 
                                 {/* Feeder Name */}
@@ -1416,20 +1538,20 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
 
                               {/* Timing panel at bottom */}
                               <div className="mt-5 pt-3.5 border-t border-gray-100 dark:border-gray-800 grid grid-cols-2 gap-3 text-[11px]">
-                                <div className={(item.type === 'Earth Fault' || item.type === 'Short Circuit') ? 'col-span-2' : ''}>
+                                <div className={(!item.estimatedRestorationTime || item.estimatedRestorationTime === 'N/A') ? 'col-span-2' : ''}>
                                   <div className="text-gray-400 dark:text-gray-500 flex items-center gap-1 font-semibold uppercase text-[9px]">
                                     <Clock className="w-3 h-3 text-gray-400" />
                                     <span>Start Time</span>
                                   </div>
                                   <span className="font-medium text-gray-700 dark:text-gray-300 block mt-0.5 font-mono">{item.startTime}</span>
                                 </div>
-                                {item.type !== 'Earth Fault' && item.type !== 'Short Circuit' && (
+                                {item.estimatedRestorationTime && item.estimatedRestorationTime !== 'N/A' && (
                                   <div>
                                     <div className="text-gray-400 dark:text-gray-500 flex items-center gap-1 font-semibold uppercase text-[9px]">
                                       <CalendarClock className="w-3.5 h-3.5 text-gray-400" />
                                       <span>Est. Restore</span>
                                     </div>
-                                    <span className="font-medium text-gray-700 dark:text-gray-300 block mt-0.5 font-mono">{item.estimatedRestorationTime}</span>
+                                    <span className="font-medium text-eeu-green dark:text-eeu-green block mt-0.5 font-mono">{item.estimatedRestorationTime}</span>
                                   </div>
                                 )}
                                 <div className="col-span-2 pt-2 border-t border-dashed border-gray-100 dark:border-gray-850 text-[10px] text-gray-400 dark:text-gray-500 font-mono flex items-center justify-end">
@@ -1456,8 +1578,9 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
                         <th className="py-3.5 px-5">Feeder Station Details</th>
                         <th className="py-3.5 px-5">Interruption Cause</th>
                         <th className="py-3.5 px-5">Timeline (Start / Restoration)</th>
-                        <th className="py-3.5 px-5 w-[500px]">Affected Location Area / Remarks</th>
+                        <th className="py-3.5 px-5 w-[460px]">Affected Location Area / Remarks</th>
                         <th className="py-3.5 px-5">Operational Status</th>
+                        <th className="py-3.5 px-5 text-right">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 dark:divide-gray-800/80 text-sm">
@@ -1468,7 +1591,7 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
                         return (
                           <React.Fragment key={`table-dir-group-${dir}`}>
                             <tr className="bg-gray-100/50 dark:bg-gray-950/40 font-bold">
-                              <td colSpan={5} className="py-3 px-5 text-xs text-gray-900 dark:text-gray-100 font-sans uppercase">
+                              <td colSpan={6} className="py-3 px-5 text-xs text-gray-900 dark:text-gray-100 font-sans uppercase">
                                 ⚡ {dir === 'Sheger Region' ? 'SHEGER REGION' : `${dir.toUpperCase()} ADDIS ABABA`} SECTOR OUTAGES ({itemsInDir.length})
                               </td>
                             </tr>
@@ -1495,7 +1618,9 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
                                       </div>
                                       <div className="flex items-center">
                                         <span className="text-[9px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-mono w-14">Est. End:</span>
-                                        <span className="font-sans font-medium">{(item.type === 'Earth Fault' || item.type === 'Short Circuit') ? 'N/A' : item.estimatedRestorationTime}</span>
+                                        <span className="font-sans font-medium">
+                                          {(item.estimatedRestorationTime && item.estimatedRestorationTime !== 'N/A') ? item.estimatedRestorationTime : 'Patrol in progress'}
+                                        </span>
                                       </div>
                                     </div>
                                   </td>
@@ -1530,6 +1655,26 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
                                       }`} />
                                       {item.status}
                                     </span>
+                                  </td>
+                                  <td className="py-4 px-5 text-right">
+                                    <button
+                                      type="button"
+                                      onClick={(e) => handleShareInterruption(item, e)}
+                                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 transition-colors cursor-pointer border border-gray-200/50 dark:border-gray-700/50"
+                                      title="Share or copy bulletin with Type"
+                                    >
+                                      {copiedInterruptionId === item.id ? (
+                                        <>
+                                          <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                                          <span className="text-emerald-600 dark:text-emerald-400 font-bold">Copied!</span>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Share2 className="w-3.5 h-3.5 text-gray-500" />
+                                          <span>Share</span>
+                                        </>
+                                      )}
+                                    </button>
                                   </td>
                                 </tr>
                               );

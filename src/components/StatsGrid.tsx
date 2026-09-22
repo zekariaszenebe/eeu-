@@ -1,6 +1,6 @@
 import React from 'react';
-import { ShieldAlert, Zap, CalendarClock } from 'lucide-react';
-import { FeederInterruption, InterruptionType, InterruptionStatus } from '../types';
+import { ShieldAlert, Zap, CalendarClock, Gauge, Server } from 'lucide-react';
+import { FeederInterruption, InterruptionType, InterruptionStatus, normalizeInterruptionType } from '../types';
 import { EarthFaultIcon } from './AgentView';
 
 interface StatsGridProps {
@@ -8,19 +8,27 @@ interface StatsGridProps {
 }
 
 export default function StatsGrid({ interruptions }: StatsGridProps) {
-  // Compute metrics dynamically
+  // Compute metrics dynamically with normalized types
   const activeCount = interruptions.filter(i => i.status !== InterruptionStatus.RESTORED).length;
   
   const earthFaults = interruptions.filter(
-    i => i.status !== InterruptionStatus.RESTORED && i.type === InterruptionType.EARTH_FAULT
+    i => i.status !== InterruptionStatus.RESTORED && normalizeInterruptionType(i.type) === InterruptionType.EARTH_FAULT
   ).length;
 
   const shortCircuits = interruptions.filter(
-    i => i.status !== InterruptionStatus.RESTORED && i.type === InterruptionType.SHORT_CIRCUIT
+    i => i.status !== InterruptionStatus.RESTORED && normalizeInterruptionType(i.type) === InterruptionType.SHORT_CIRCUIT
+  ).length;
+
+  const overCurrents = interruptions.filter(
+    i => i.status !== InterruptionStatus.RESTORED && normalizeInterruptionType(i.type) === InterruptionType.OVER_CURRENT
+  ).length;
+
+  const ldcOutages = interruptions.filter(
+    i => i.status !== InterruptionStatus.RESTORED && normalizeInterruptionType(i.type) === InterruptionType.LDC
   ).length;
 
   const planned = interruptions.filter(
-    i => i.status !== InterruptionStatus.RESTORED && (i.type === InterruptionType.PLANNED_INTERRUPTION || i.type === InterruptionType.OPERATIONAL_INTERRUPTION)
+    i => i.status !== InterruptionStatus.RESTORED && (normalizeInterruptionType(i.type) === InterruptionType.PLANNED_INTERRUPTION || normalizeInterruptionType(i.type) === InterruptionType.OPERATIONAL_INTERRUPTION)
   ).length;
 
   const statCards = [
@@ -37,36 +45,36 @@ export default function StatsGrid({ interruptions }: StatsGridProps) {
     },
     {
       id: "stat-earth-fault",
-      title: "Earth Faults",
-      value: earthFaults,
+      title: "Earth & Short Circuit",
+      value: earthFaults + shortCircuits,
       textColor: "text-amber-600 dark:text-amber-400 font-bold",
-      subtext: "Ground patrols dispatched",
+      subtext: `${earthFaults} Ground Fault · ${shortCircuits} Short Circuit`,
       icon: EarthFaultIcon,
       iconBg: "bg-amber-50 dark:bg-amber-950/40 border border-amber-200/70 dark:border-amber-900/40 shadow-xs",
       iconColor: "text-amber-600 dark:text-amber-400",
       indicator: "right now"
     },
     {
-      id: "stat-short-circuit",
-      title: "Short Circuit",
-      value: shortCircuits,
-      textColor: "text-orange-600 dark:text-orange-400 font-bold",
-      subtext: "Phase-to-phase contact",
-      icon: Zap,
-      iconBg: "bg-orange-50 dark:bg-orange-950/40 border border-orange-200/70 dark:border-orange-900/40 shadow-xs",
-      iconColor: "text-orange-600 dark:text-orange-400",
+      id: "stat-overcurrent-ldc",
+      title: "Over Current & LDC",
+      value: overCurrents + ldcOutages,
+      textColor: "text-teal-600 dark:text-teal-400 font-bold",
+      subtext: `${overCurrents} Over Current · ${ldcOutages} LDC Directive`,
+      icon: Gauge,
+      iconBg: "bg-teal-50 dark:bg-teal-950/40 border border-teal-200/70 dark:border-teal-900/40 shadow-xs",
+      iconColor: "text-teal-600 dark:text-teal-400",
       indicator: "right now"
     },
     {
       id: "stat-planned",
-      title: "Planned & OPERATIONAL",
+      title: "Planned & Operational",
       value: planned,
       textColor: "text-sky-600 dark:text-sky-400 font-bold",
-      subtext: "Pre-notified clients",
+      subtext: "Pre-notified clients & maintenance",
       icon: CalendarClock,
       iconBg: "bg-sky-50 dark:bg-sky-950/40 border border-sky-200/70 dark:border-sky-900/40 shadow-xs",
       iconColor: "text-sky-600 dark:text-sky-400",
-      indicator: "right now"
+      indicator: "scheduled"
     }
   ];
 

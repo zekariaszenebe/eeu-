@@ -178,6 +178,18 @@ export const INITIAL_INTERRUPTIONS: FeederInterruption[] = [
     affectedArea: 'ሰበታ ከተማ ሙሉ ፤ አለምገና ፤ ዋላያ ፤ አዋሽ መልካሳ መገንጠያ እና የኢንዱስትሪ ዞኑ በሙሉ',
     remark: 'Total blackout across regional 132kV grid interconnect. National dispatch center coordinating black-start step recovery.',
     lastUpdated: getPastHoursString(0.1)
+  },
+  {
+    id: 'f-13',
+    feederName: 'SULULTA - SUL-02',
+    district: 'Team C',
+    type: InterruptionType.LDC,
+    status: InterruptionStatus.ACTIVE,
+    startTime: getPastHoursString(1.1),
+    estimatedRestorationTime: 'N/A',
+    affectedArea: 'ሱሉልታ ከተማ ፤ አደባባይ ፤ ኖክ ማደያ ፤ ፖሊስ መምሪያ እና የገበያ ማዕከላት አካባቢ',
+    remark: 'Load Dispatch Center (LDC) instructions from National Grid. Rotational feeder shedding authorized.',
+    lastUpdated: getPastHoursString(0.1)
   }
 ];
 

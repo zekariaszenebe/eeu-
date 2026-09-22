@@ -10,6 +10,46 @@ export enum InterruptionType {
   LDC = 'LDC'
 }
 
+export function normalizeInterruptionType(raw: unknown): InterruptionType {
+  if (!raw || typeof raw !== 'string') return InterruptionType.EARTH_FAULT;
+  const cleaned = raw.trim().toLowerCase().replace(/[\-_]/g, ' ');
+  
+  if (cleaned.includes('over current') || cleaned.includes('overcurrent') || cleaned === 'oc') {
+    return InterruptionType.OVER_CURRENT;
+  }
+  if (cleaned === 'ldc' || cleaned === 'lcd' || cleaned.includes('load dispatch') || cleaned.includes('load control dispatch') || cleaned.startsWith('ldc') || cleaned.startsWith('lcd')) {
+    return InterruptionType.LDC;
+  }
+  if (cleaned.includes('earth') || cleaned.includes('ground') || cleaned === 'ef') {
+    return InterruptionType.EARTH_FAULT;
+  }
+  if (cleaned.includes('short') || cleaned === 'sc') {
+    return InterruptionType.SHORT_CIRCUIT;
+  }
+  if (cleaned.includes('differential') || cleaned === 'diff') {
+    return InterruptionType.DIFFERENTIAL;
+  }
+  if (cleaned.includes('blackout') || cleaned.includes('total')) {
+    return InterruptionType.TOTAL_BLACKOUT;
+  }
+  if (cleaned.includes('plan')) {
+    return InterruptionType.PLANNED_INTERRUPTION;
+  }
+  if (cleaned.includes('operation')) {
+    return InterruptionType.OPERATIONAL_INTERRUPTION;
+  }
+  if (cleaned.includes('shedding')) {
+    return InterruptionType.SHEDDING;
+  }
+
+  // Exact matching against enum values
+  for (const val of Object.values(InterruptionType)) {
+    if (val.toLowerCase() === cleaned) return val;
+  }
+  
+  return InterruptionType.EARTH_FAULT;
+}
+
 export enum InterruptionStatus {
   ACTIVE = 'Active',
   UNDER_INVESTIGATION = 'Partially Connected',
