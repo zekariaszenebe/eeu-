@@ -6,12 +6,14 @@ import {
   Columns, Rows, Zap, Settings, Compass, ArrowUp, ArrowDown, ArrowLeft, ArrowRight,
   Trash2, Edit3, Plus, MessageSquare, AlertCircle, Languages,
   Undo, Redo, Bold, Italic, Underline, Strikethrough, AlignLeft, AlignCenter, AlignRight, AlignJustify, Table, ChevronDown,
-  Activity, Gauge, PowerOff, Server, Share2, Copy, Check
+  Activity, Gauge, PowerOff, Server
 } from 'lucide-react';
 import { FeederInterruption, InterruptionType, InterruptionStatus, normalizeInterruptionType, stripBrackets, TeamLeaderNote } from '../types';
 import { INITIAL_DISTRICTS } from '../data/mockData';
 import { addTeamLeaderNoteDoc, updateTeamLeaderNoteDoc, deleteTeamLeaderNoteDoc, subscribeToInterruptions } from '../lib/firestoreService';
 import { LanguageMode, translateAmharicLocation, formatLocationDisplay } from '../utils/locationLanguage';
+import { getCardinalDirection } from '../utils/direction';
+export { getCardinalDirection };
 
 export function sanitizeHtml(html: string): string {
   if (!html) return '';
@@ -27,106 +29,6 @@ export function sanitizeHtml(html: string): string {
   cleaned = cleaned.replace(/href\s*=\s*["']javascript:[^"']*["']/gi, '');
   
   return cleaned;
-}
-
-export function getCardinalDirection(district: string, feederName?: string): 'North' | 'East' | 'West' | 'South' | 'Sheger Region' {
-  const f = (feederName || '');
-  
-  // Try to parse from feeder name if it contains '|'
-  if (f.includes('|')) {
-    const parts = f.split('|').map(s => s.trim());
-    if (parts.length >= 2) {
-       const direction = parts[1];
-       if (['North', 'East', 'West', 'South', 'Sheger Region'].includes(direction)) {
-         return direction as 'North' | 'East' | 'West' | 'South' | 'Sheger Region';
-       }
-    }
-  }
-
-  const d = district.toLowerCase();
-  const fUpper = f.toUpperCase();
-
-  // North list
-  if (
-    fUpper.includes('ADE-08') ||
-    fUpper.includes('ADG-04') || fUpper.includes('ADG-3') ||
-    fUpper.includes('ADN-01') || fUpper.includes('ADN-02') || fUpper.includes('ADN-03') || fUpper.includes('ADN-04') || fUpper.includes('ADN-06') ||
-    fUpper.includes('ADW-02') ||
-    fUpper.includes('BEL-01') || fUpper.includes('BEL-03') || fUpper.includes('BEL-05') || fUpper.includes('BEL-06') ||
-    fUpper.includes('BLL-02') || fUpper.includes('BLL-14') ||
-    fUpper.includes('SHG-01') || fUpper.includes('SHG-02') || fUpper.includes('SHG-05') || fUpper.includes('SHG-06') || fUpper.includes('SHG-07') || fUpper.includes('SHG-09') || fUpper.includes('SHG-10') ||
-    fUpper.includes('SUL-01')
-  ) {
-    return 'North';
-  }
-
-  // Sheger list (remove central and add sheger, matches ፊንፊኔ ዙሪያ/ፊዙዲ)
-  if (
-    fUpper.includes('GEF-') || // GEF-01 to GEF-21
-    fUpper.includes('LEG-12') ||
-    fUpper.includes('SEB-II-') || // SEB-II-1 to SEB-II-15
-    fUpper.includes('SHG-04') || fUpper.includes('SHG-8') ||
-    fUpper.includes('SUL-02') || fUpper.includes('SUL-03') || fUpper.includes('SUL-04') || fUpper.includes('SUL-05') || fUpper.includes('SUL-06') ||
-    d.includes('sheger') || d.includes('finfinne') || d.includes('ፊንፊኔ') || d.includes('ፊዙዲ')
-  ) {
-    return 'Sheger Region';
-  }
-
-  // West list
-  if (
-    f.includes('ADC-04') || f.includes('ADC-05') || f.includes('ADC-07') || f.includes('ADC-08') || f.includes('ADC-11') || f.includes('ADC-15') ||
-    f.includes('ADE-10') ||
-    f.includes('ADW-01') || f.includes('ADW-03') || f.includes('ADW-04') || f.includes('ADW-05') || f.includes('ADW-06') || f.includes('ADW-07') || f.includes('ADW-08') || f.includes('ADW-09') || f.includes('ADW-10') || f.includes('ADW-11') || f.includes('ADW-12') ||
-    f.includes('ANF-03') ||
-    f.includes('BOL ARA-1') ||
-    f.includes('BLL-01') || f.includes('BLL-03') || f.includes('BLL-06') || f.includes('BLL-07') || f.includes('BLL-09') || f.includes('BLL-10') || f.includes('BLL-11') || f.includes('BLL-12') || f.includes('BLL-4') ||
-    f.includes('NIF-01') || f.includes('NIF-03') ||
-    f.includes('SEB-I-01') || f.includes('SEB-I-02') || f.includes('SEB-I-03') || f.includes('SEB-I-04') || f.includes('SEB-I-05') || f.includes('SEB-I-06') || f.includes('SEB-I-07') || f.includes('SEB-I-08') || f.includes('SEB-I-09') || f.includes('SEB-I-10') || f.includes('SEB-I-11') || f.includes('SEB-I-12') ||
-    f.includes('SHG-5') || f.includes('SHG-9') ||
-    f.includes('ALEM BANK')
-  ) {
-    return 'West';
-  }
-
-  // South list
-  if (
-    f.includes('AKA.I-') ||
-    f.includes('GEL-') ||
-    f.includes('GIS-') ||
-    f.includes('GOF-') ||
-    f.includes('KAL-') ||
-    f.includes('KOY-') ||
-    f.includes('MEK-') ||
-    f.includes('NIF-04') || f.includes('NIF-06') || f.includes('NIF-07') || f.includes('NIF-08') || f.includes('NIF-09') || f.includes('NIF-10') ||
-    f.includes('SEB-I-13') || f.includes('SEB-I-14') || f.includes('SEB-I-15') ||
-    d.includes('south')
-  ) {
-    return 'South';
-  }
-
-  // East list
-  if (
-    f.includes('ADE-01') || f.includes('ADE-02') || f.includes('ADE-03') || f.includes('ADE-04') || f.includes('ADE-05') || f.includes('ADE-07') || f.includes('ADE-09') || f.includes('ADE-11') || f.includes('ADE-12') ||
-    f.includes('ARB-') ||
-    f.includes('AYT-') ||
-    f.includes('BEL-02') || f.includes('BEL-04') ||
-    f.includes('BLM-') ||
-    f.includes('COT-') ||
-    f.includes('LEG-') ||
-    f.includes('WER-') ||
-    f.includes('COTEBE') ||
-    d.includes('east')
-  ) {
-    return 'East';
-  }
-
-  // Fallbacks:
-  if (d.includes('north') || f.includes('NORTH')) return 'North';
-  if (d.includes('east') || f.includes('EAST')) return 'East';
-  if (d.includes('west') || f.includes('WEST')) return 'West';
-  if (d.includes('south') || f.includes('SOUTH')) return 'South';
-
-  return 'Sheger Region'; 
 }
 
 export function EarthFaultIcon({ className }: { className?: string }) {
@@ -310,39 +212,6 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
 
   // View state (horizontal vs grid vs table)
   const [viewLayout, setViewLayout] = useState<'horizontal' | 'grid' | 'table'>('horizontal');
-
-  // Interruption Alert sharing state
-  const [copiedInterruptionId, setCopiedInterruptionId] = useState<string | null>(null);
-
-  const handleShareInterruption = async (item: FeederInterruption, e?: React.MouseEvent) => {
-    if (e) {
-      e.stopPropagation();
-    }
-    const text = formatInterruptionShareText(item, languageMode);
-    
-    // Attempt modern web share if supported on mobile/touch, else copy to clipboard
-    if (navigator.share && /mobile|android|iphone|ipad/i.test(navigator.userAgent)) {
-      try {
-        await navigator.share({
-          title: `EEU Interruption: ${stripBrackets(item.feederName)} (${normalizeInterruptionType(item.type)})`,
-          text: text
-        });
-        setCopiedInterruptionId(item.id);
-        setTimeout(() => setCopiedInterruptionId(null), 2500);
-        return;
-      } catch (err) {
-        // User cancelled or share dismissed, proceed to clipboard copy fallback
-      }
-    }
-
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopiedInterruptionId(item.id);
-      setTimeout(() => setCopiedInterruptionId(null), 2500);
-    } catch (err) {
-      console.error('Clipboard copy failed:', err);
-    }
-  };
 
   // Team Leader Notes state controls
   const [isAddingNote, setIsAddingNote] = useState(false);
@@ -1399,29 +1268,8 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
                                   </div>
                                 </div>
 
-                                <div className="flex flex-col lg:items-end gap-2 pt-1">
-                                  <div className="text-[10px] text-gray-400 dark:text-gray-500 font-sans text-right flex flex-col justify-end leading-normal">
-                                    <span>Last Updated: {item.lastUpdated}</span>
-                                  </div>
-
-                                  <button
-                                    type="button"
-                                    onClick={(e) => handleShareInterruption(item, e)}
-                                    className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 transition-all shadow-2xs border border-gray-200 dark:border-gray-700 cursor-pointer"
-                                    title="Share or copy interruption bulletin with Type"
-                                  >
-                                    {copiedInterruptionId === item.id ? (
-                                      <>
-                                        <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                                        <span className="text-emerald-600 dark:text-emerald-400 font-bold">Copied with Type!</span>
-                                      </>
-                                    ) : (
-                                      <>
-                                        <Share2 className="w-3.5 h-3.5 text-gray-500 dark:text-gray-400" />
-                                        <span>Share Interruption</span>
-                                      </>
-                                    )}
-                                  </button>
+                                <div className="text-[10px] text-gray-400 dark:text-gray-500 font-sans text-right flex flex-col justify-end leading-normal">
+                                  <span>Last Updated: {item.lastUpdated}</span>
                                 </div>
                               </div>
                             </div>
@@ -1479,25 +1327,6 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
                                       {item.status}
                                     </span>
                                   </div>
-
-                                  <button
-                                    type="button"
-                                    onClick={(e) => handleShareInterruption(item, e)}
-                                    className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium text-gray-600 dark:text-gray-300 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 transition-colors cursor-pointer border border-gray-200/60 dark:border-gray-700/60"
-                                    title="Share or copy interruption bulletin with Type"
-                                  >
-                                    {copiedInterruptionId === item.id ? (
-                                      <>
-                                        <Check className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
-                                        <span className="text-emerald-600 dark:text-emerald-400 font-bold">Copied!</span>
-                                      </>
-                                    ) : (
-                                      <>
-                                        <Share2 className="w-3 h-3 text-gray-500" />
-                                        <span>Share</span>
-                                      </>
-                                    )}
-                                  </button>
                                 </div>
 
                                 {/* Feeder Name */}
@@ -1580,7 +1409,6 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
                         <th className="py-3.5 px-5">Timeline (Start / Restoration)</th>
                         <th className="py-3.5 px-5 w-[460px]">Affected Location Area / Remarks</th>
                         <th className="py-3.5 px-5">Operational Status</th>
-                        <th className="py-3.5 px-5 text-right">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 dark:divide-gray-800/80 text-sm">
@@ -1591,7 +1419,7 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
                         return (
                           <React.Fragment key={`table-dir-group-${dir}`}>
                             <tr className="bg-gray-100/50 dark:bg-gray-950/40 font-bold">
-                              <td colSpan={6} className="py-3 px-5 text-xs text-gray-900 dark:text-gray-100 font-sans uppercase">
+                              <td colSpan={5} className="py-3 px-5 text-xs text-gray-900 dark:text-gray-100 font-sans uppercase">
                                 ⚡ {dir === 'Sheger Region' ? 'SHEGER REGION' : `${dir.toUpperCase()} ADDIS ABABA`} SECTOR OUTAGES ({itemsInDir.length})
                               </td>
                             </tr>
@@ -1655,26 +1483,6 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
                                       }`} />
                                       {item.status}
                                     </span>
-                                  </td>
-                                  <td className="py-4 px-5 text-right">
-                                    <button
-                                      type="button"
-                                      onClick={(e) => handleShareInterruption(item, e)}
-                                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 transition-colors cursor-pointer border border-gray-200/50 dark:border-gray-700/50"
-                                      title="Share or copy bulletin with Type"
-                                    >
-                                      {copiedInterruptionId === item.id ? (
-                                        <>
-                                          <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                                          <span className="text-emerald-600 dark:text-emerald-400 font-bold">Copied!</span>
-                                        </>
-                                      ) : (
-                                        <>
-                                          <Share2 className="w-3.5 h-3.5 text-gray-500" />
-                                          <span>Share</span>
-                                        </>
-                                      )}
-                                    </button>
                                   </td>
                                 </tr>
                               );

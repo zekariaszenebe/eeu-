@@ -16,6 +16,7 @@ import {
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { FeederInterruption, InterruptionStatus, InterruptionType, normalizeInterruptionType, TeamLeaderNote, ContactItem, TeamLeaderUser } from '../types';
+import { getCardinalDirection } from '../utils/direction';
 import { INITIAL_INTERRUPTIONS, INITIAL_FEEDERS_LIST, INITIAL_CUSTOMER_CONTACTS } from '../data/mockData';
 import { FEEDERS_VERSION } from '../data/feedersList';
 import { HubRecord, HUB_RECORDS } from '../data/hubData';
@@ -189,18 +190,20 @@ export function subscribeToInterruptions(onUpdate: (items: FeederInterruption[])
       const list: FeederInterruption[] = [];
       snapshot.forEach((doc) => {
         const data = doc.data();
+        const feeder = data.feederName || '';
+        const dist = data.district || 'Team A';
         list.push({
           id: data.id || doc.id,
-          feederName: data.feederName,
-          district: data.district,
-          direction: data.direction,
+          feederName: feeder,
+          district: dist,
+          direction: data.direction || getCardinalDirection(dist, feeder),
           type: normalizeInterruptionType(data.type),
-          status: data.status,
-          startTime: data.startTime,
-          estimatedRestorationTime: data.estimatedRestorationTime,
-          affectedArea: data.affectedArea,
-          remark: data.remark,
-          lastUpdated: data.lastUpdated
+          status: data.status || InterruptionStatus.ACTIVE,
+          startTime: data.startTime || '',
+          estimatedRestorationTime: data.estimatedRestorationTime || 'N/A',
+          affectedArea: data.affectedArea || '',
+          remark: data.remark || '',
+          lastUpdated: data.lastUpdated || ''
         } as FeederInterruption);
       });
       
@@ -210,6 +213,10 @@ export function subscribeToInterruptions(onUpdate: (items: FeederInterruption[])
         return (b.lastUpdated || '').localeCompare(a.lastUpdated || '');
       });
       
+      try {
+        localStorage.setItem('eeu-interruptions', JSON.stringify(sorted));
+      } catch {}
+
       onUpdate(sorted);
     }, (err) => {
       handleFirestoreError(err, OperationType.GET, 'interruptions');
@@ -278,6 +285,36 @@ export function subscribeToFeedersList(onUpdate: (items: string[]) => void) {
 }
 
 /**
+ * Helper to ensure no undefined fields are passed to Firestore setDoc
+ */
+function sanitizeInterruptionDoc(item: FeederInterruption): Record<string, any> {
+  const feederName = (item.feederName || '').trim();
+  const district = item.district || 'Team A';
+  const direction = item.direction || getCardinalDirection(district, feederName);
+  const type = normalizeInterruptionType(item.type);
+  const status = item.status || InterruptionStatus.ACTIVE;
+  const startTime = item.startTime || new Date().toLocaleString('en-US');
+  const estimatedRestorationTime = item.estimatedRestorationTime || 'N/A';
+  const affectedArea = (item.affectedArea || '').trim();
+  const remark = (item.remark || '').trim();
+  const lastUpdated = item.lastUpdated || startTime;
+
+  return {
+    id: item.id,
+    feederName,
+    district,
+    direction,
+    type,
+    status,
+    startTime,
+    estimatedRestorationTime,
+    affectedArea,
+    remark,
+    lastUpdated
+  };
+}
+
+/**
  * Creates a new interruption and a companion notification.
  */
 export async function addInterruptionDoc(entry: Omit<FeederInterruption, 'id' | 'lastUpdated'>, customId?: string) {
@@ -291,11 +328,11 @@ export async function addInterruptionDoc(entry: Omit<FeederInterruption, 'id' | 
     hour12: true
   });
 
-  const record: FeederInterruption = {
+  const rawRecord: FeederInterruption = {
     id: newId,
     feederName: entry.feederName || '',
     district: entry.district || 'Team A',
-    direction: entry.direction,
+    direction: entry.direction || getCardinalDirection(entry.district || 'Team A', entry.feederName || ''),
     type: normalizeInterruptionType(entry.type),
     status: entry.status || InterruptionStatus.ACTIVE,
     startTime: entry.startTime || timestampStr,
@@ -304,6 +341,8 @@ export async function addInterruptionDoc(entry: Omit<FeederInterruption, 'id' | 
     remark: entry.remark || '',
     lastUpdated: timestampStr
   };
+
+  const record = sanitizeInterruptionDoc(rawRecord) as unknown as FeederInterruption;
 
   // Local storage update
   const localList = getLocal<FeederInterruption[]>('eeu-interruptions', []);
@@ -336,6 +375,7 @@ export async function updateInterruptionDoc(id: string, entry: Partial<FeederInt
     id,
     feederName: '',
     district: 'Team A',
+    direction: 'North',
     type: InterruptionType.EARTH_FAULT,
     status: InterruptionStatus.ACTIVE,
     startTime: timestampStr,
@@ -345,11 +385,11 @@ export async function updateInterruptionDoc(id: string, entry: Partial<FeederInt
     lastUpdated: timestampStr
   };
 
-  const merged: FeederInterruption = {
+  const rawMerged: FeederInterruption = {
     id: id,
     feederName: entry.feederName ?? safeExisting.feederName ?? '',
     district: entry.district ?? safeExisting.district ?? 'Team A',
-    direction: entry.direction ?? safeExisting.direction,
+    direction: entry.direction ?? safeExisting.direction ?? getCardinalDirection(entry.district || safeExisting.district || 'Team A', entry.feederName || safeExisting.feederName || ''),
     type: normalizeInterruptionType(entry.type ?? safeExisting.type),
     status: entry.status ?? safeExisting.status ?? InterruptionStatus.ACTIVE,
     startTime: entry.startTime ?? safeExisting.startTime ?? timestampStr,
@@ -358,6 +398,8 @@ export async function updateInterruptionDoc(id: string, entry: Partial<FeederInt
     remark: entry.remark ?? safeExisting.remark ?? '',
     lastUpdated: timestampStr
   };
+
+  const merged = sanitizeInterruptionDoc(rawMerged) as unknown as FeederInterruption;
 
   // Local storage update
   const localList = getLocal<FeederInterruption[]>('eeu-interruptions', []);

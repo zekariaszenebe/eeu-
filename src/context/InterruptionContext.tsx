@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { FeederInterruption, InterruptionStatus, normalizeInterruptionType } from '../types';
+import { getCardinalDirection } from '../utils/direction';
 import { 
   addInterruptionDoc, 
   updateInterruptionDoc, 
@@ -167,11 +168,13 @@ export const InterruptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
       minute: '2-digit',
       hour12: true
     });
+    const dist = entry.district || 'Team A';
     const optimisticRecord: FeederInterruption = {
       id: tempId,
       feederName: entry.feederName,
-      district: entry.district,
-      type: entry.type,
+      district: dist,
+      direction: entry.direction || getCardinalDirection(dist, entry.feederName),
+      type: normalizeInterruptionType(entry.type),
       status: entry.status,
       startTime: entry.startTime,
       estimatedRestorationTime: entry.estimatedRestorationTime,
@@ -219,6 +222,8 @@ export const InterruptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
       const updatedRecord: FeederInterruption = {
         ...existing,
         ...entry,
+        type: entry.type ? normalizeInterruptionType(entry.type) : existing.type,
+        direction: entry.direction || existing.direction || getCardinalDirection(entry.district || existing.district, entry.feederName || existing.feederName),
         lastUpdated: timestampStr
       };
 

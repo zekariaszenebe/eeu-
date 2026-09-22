@@ -4,7 +4,7 @@ import {
   RefreshCw, Info, MapPin, Zap, Clock, ShieldCheck, HelpCircle, Download, Copy, Check, Building,
   UserCheck, Users, Eye, EyeOff, UserPlus, KeyRound, Shield, Search
 } from 'lucide-react';
-import { FeederInterruption, InterruptionType, InterruptionStatus, stripBrackets, TeamLeaderUser, UserRole } from '../types';
+import { FeederInterruption, InterruptionType, InterruptionStatus, stripBrackets, TeamLeaderUser, UserRole, normalizeInterruptionType } from '../types';
 import { INITIAL_DISTRICTS, INITIAL_FEEDERS_LIST } from '../data/mockData';
 import { InterruptionTypeBadge, getCardinalDirection } from './AgentView';
 import { LanguageMode, translateAmharicLocation, formatLocationDisplay } from '../utils/locationLanguage';
@@ -487,17 +487,21 @@ export default function AdminPanel({
       type === InterruptionType.OVER_CURRENT ||
       type === InterruptionType.TOTAL_BLACKOUT
     );
-    const finalEstimatedRestoration = isUnplannedTrip ? (estimatedRestoration.trim() || 'N/A') : estimatedRestoration;
+    const finalEstimatedRestoration = isUnplannedTrip 
+      ? (estimatedRestoration.trim() || 'N/A') 
+      : (estimatedRestoration.trim() || (type === InterruptionType.LDC ? 'Pending LDC instructions' : 'N/A'));
 
     const finalDistrict = (isTeamLeader || userRole === 'team_leader')
       ? (currentTeamLeader?.district || district || 'Team D')
       : (district || INITIAL_DISTRICTS[0]);
 
+    const finalDirection = direction || getCardinalDirection(finalDistrict, finalFeederName);
+
     const payload = {
       feederName: finalFeederName,
       district: finalDistrict,
-      direction: direction,
-      type,
+      direction: finalDirection,
+      type: normalizeInterruptionType(type),
       status,
       startTime,
       estimatedRestorationTime: finalEstimatedRestoration,
@@ -1614,17 +1618,17 @@ export default function AdminPanel({
                   />
                 </div>
 
-                {(type === InterruptionType.PLANNED_INTERRUPTION || type === InterruptionType.OPERATIONAL_INTERRUPTION) && (
+                {(type === InterruptionType.PLANNED_INTERRUPTION || type === InterruptionType.OPERATIONAL_INTERRUPTION || type === InterruptionType.SHEDDING || type === InterruptionType.LDC) && (
                   <div>
                     <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase font-mono tracking-wider mb-1.5">
-                      Estimated Restoration Time
+                      {type === InterruptionType.LDC ? 'Est. Clearance / LDC Directive' : 'Estimated Restoration Time'}
                     </label>
                     <input
                       id="form-estimRestor-input"
                       type="text"
                       value={estimatedRestoration}
                       onChange={(e) => setEstimatedRestoration(e.target.value)}
-                      placeholder="e.g. Jun 19, 11:30 AM"
+                      placeholder={type === InterruptionType.LDC ? "e.g. Until further LDC notice / Jun 19, 11:30 AM" : "e.g. Jun 19, 11:30 AM"}
                       className="w-full text-xs rounded-xl glass-input p-2.5 text-gray-900 dark:text-white focus:outline-none focus:ring-1.5 focus:ring-eeu-green"
                     />
                   </div>

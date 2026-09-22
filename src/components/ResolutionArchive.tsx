@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { History, ShieldCheck, CheckSquare, Search, Award, MapPin, Calendar, Compass, ShieldOff, Languages } from 'lucide-react';
 import { FeederInterruption, InterruptionStatus, stripBrackets } from '../types';
 import { translateAmharicLocation } from '../utils/locationLanguage';
+import { InterruptionTypeBadge } from './AgentView';
 
 interface ResolutionArchiveProps {
   interruptions: FeederInterruption[];
@@ -70,6 +71,7 @@ export default function ResolutionArchive({ interruptions }: ResolutionArchivePr
                   <span className="text-[10px] font-mono font-bold bg-eeu-green/10 text-eeu-green px-2 py-0.5 rounded-full uppercase">
                     RESOLVED & SUCCESSFUL
                   </span>
+                  <InterruptionTypeBadge type={item.type} />
                 </div>
 
                 <h4 className="font-display font-semibold text-sm text-gray-900 dark:text-white leading-tight">
