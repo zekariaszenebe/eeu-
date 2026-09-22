@@ -42,7 +42,7 @@ export const INITIAL_INTERRUPTIONS: FeederInterruption[] = [
     type: InterruptionType.EARTH_FAULT,
     status: InterruptionStatus.ACTIVE,
     startTime: getPastHoursString(1.5),
-    estimatedRestorationTime: getFutureHoursString(2),
+    estimatedRestorationTime: 'N/A',
     affectedArea: 'ለገሐር፣ ቤተዛታ ሆስፒታል፣ ኦሮሚያ ባሕል ማዕከልጀርባ ፣ ጊዮን ሆቴል፣ እስጢፋኖስ ድልድይ አካባቢ፣ እስጢፋኖስ ቤተክርስቲያን ፤ ካሳንቺስ ግራንድ ፓላስ ሆቴል አካባቢ',
     remark: 'Ground fault detected on Legihar overhead node. Protection relays opened line breaker 15. Patrol team tracing cables.',
     lastUpdated: getPastHoursString(0.2)
@@ -54,7 +54,7 @@ export const INITIAL_INTERRUPTIONS: FeederInterruption[] = [
     type: InterruptionType.SHORT_CIRCUIT,
     status: InterruptionStatus.ACTIVE,
     startTime: getPastHoursString(3),
-    estimatedRestorationTime: getFutureHoursString(1.5),
+    estimatedRestorationTime: 'N/A',
     affectedArea: 'ጋቦን ኢንባሲ ፤ 24 ስፖርት ኮሚሽን ፤አደይ አበባ ስታዲየም ፤ 24 ኮንዶሚኒየም ፤ጨጨሆ የባህል አዳራሽ ፤ መሶብ ፤ ቦሌ መድሀኒአለም ፤ ቦሌ 2ተኛ ደረጃ ትምህርት ቤት ፤ ሬድዋን ህንጻ ፤ ሞኪንኮ ጀርባ ፤ ሰላም ህንጻ ፤ ኦሮሚያ ታወር ፤ ዮጎ ቸርች ፤ ቀነኒሳ ሆቴል ፤ ብርሀነ አደሬ ህንጻ ፤ አርመን ሆቴል ፤ ሞሞና ሆቴል ፤ ካሌብ ሆቴል ፤ መድሀኒአለም ታወር ፤',
     remark: 'Transient overhead contact due to windstorm. Line inspection under progress.',
     lastUpdated: getPastHoursString(0.5)
@@ -78,7 +78,7 @@ export const INITIAL_INTERRUPTIONS: FeederInterruption[] = [
     type: InterruptionType.EARTH_FAULT,
     status: InterruptionStatus.ACTIVE,
     startTime: getPastHoursString(2.5),
-    estimatedRestorationTime: getFutureHoursString(1.2),
+    estimatedRestorationTime: 'N/A',
     affectedArea: 'ሀግቤስ አራት መንታ፣ ጎጃም በረንዳ ጫፍ ፣ ጅንአድ፣ አበበች ጎበና ፣ ቄጤማ ተራ፣ ፓስተር አደባባይ፤ ጳውሎስ ሆስፒታል፣ አቤት ሆስፒታል፣ ቅዱስ ዮሐንስ ቤ/ክ፣',
     remark: 'Low-impedance earth leakage detected on primary feeder trunk. Sector crews dispatched for insulation scans.',
     lastUpdated: getPastHoursString(1)
@@ -126,7 +126,7 @@ export const INITIAL_INTERRUPTIONS: FeederInterruption[] = [
     type: InterruptionType.SHORT_CIRCUIT,
     status: InterruptionStatus.ACTIVE,
     startTime: getPastHoursString(0.8),
-    estimatedRestorationTime: getFutureHoursString(2.5),
+    estimatedRestorationTime: 'N/A',
     affectedArea: 'ሜክሲኮ ደብረወርቅ ሕንጻ፣ ለገሐር ጀርባ ፣ ለገሐር አሸዋ ተራ ፣ ኤግዝቢሽን ሴንተር፣ ፍላሚንጎ፣ኦሎምፒያ ፣ ደንበል፣ ደንበል ጀርባ፣ ፐርፕል ካፌ ፣ ቦሌ ማተሚያ ቤት ፤ ወሎ ሰፈር በከፊል',
     remark: 'Transformer trip flagged due to load surges near Flamingo/Olympia segments. Emergency response dispatched.',
     lastUpdated: getPastHoursString(0.1)
@@ -138,7 +138,7 @@ export const INITIAL_INTERRUPTIONS: FeederInterruption[] = [
     type: InterruptionType.EARTH_FAULT,
     status: InterruptionStatus.ACTIVE,
     startTime: getPastHoursString(1.2),
-    estimatedRestorationTime: getFutureHoursString(3.2),
+    estimatedRestorationTime: 'N/A',
     affectedArea: 'ድሬ ከአስፋልት በታች፣ ጉዳ፣ ኬላ፣ ጉዮ፣ ታጠቅ ኢንዱስትሪ መንደር በከፊል ፣ቶልቻ ፤ ሰሪፊ ፤ ጉጄ ፤ ቶልቻ ፤ ታጠቅ ኢንዱስትሪ ፤ ፌስቱላ ማዕከል እና አካባቢው',
     remark: 'Permanent earth fault on Burayu path. Patrol crew tracking insulator breakdown near heavy factories.',
     lastUpdated: getPastHoursString(0.4)

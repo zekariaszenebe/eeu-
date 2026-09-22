@@ -4,7 +4,7 @@ import {
   RefreshCw, Info, MapPin, Zap, Clock, ShieldCheck, HelpCircle, Download, Copy, Check, Building,
   UserCheck, Users, Eye, EyeOff, UserPlus, KeyRound, Shield, Search
 } from 'lucide-react';
-import { FeederInterruption, InterruptionType, InterruptionStatus, stripBrackets, TeamLeaderUser, UserRole, normalizeInterruptionType } from '../types';
+import { FeederInterruption, InterruptionType, InterruptionStatus, stripBrackets, TeamLeaderUser, UserRole, normalizeInterruptionType, isPlannedOrOperational } from '../types';
 import { INITIAL_DISTRICTS, INITIAL_FEEDERS_LIST } from '../data/mockData';
 import { InterruptionTypeBadge, getCardinalDirection } from './AgentView';
 import { LanguageMode, translateAmharicLocation, formatLocationDisplay } from '../utils/locationLanguage';
@@ -276,15 +276,19 @@ export default function AdminPanel({
       hour12: true
     }));
     
-    // Default estimated 3 hours from now
-    const future = new Date(now.getTime() + 3 * 60 * 60 * 1000);
-    setEstimatedRestoration(future.toLocaleString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true
-    }));
+    // Default estimated 3 hours from now if planned/operational
+    if (isPlannedOrOperational(type)) {
+      const future = new Date(now.getTime() + 3 * 60 * 60 * 1000);
+      setEstimatedRestoration(future.toLocaleString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      }));
+    } else {
+      setEstimatedRestoration('');
+    }
     
     setAffectedArea('');
     setRemark('');
@@ -480,16 +484,9 @@ export default function AdminPanel({
       return;
     }
 
-    const isUnplannedTrip = (
-      type === InterruptionType.EARTH_FAULT ||
-      type === InterruptionType.SHORT_CIRCUIT ||
-      type === InterruptionType.DIFFERENTIAL ||
-      type === InterruptionType.OVER_CURRENT ||
-      type === InterruptionType.TOTAL_BLACKOUT
-    );
-    const finalEstimatedRestoration = isUnplannedTrip 
-      ? (estimatedRestoration.trim() || 'N/A') 
-      : (estimatedRestoration.trim() || (type === InterruptionType.LDC ? 'Pending LDC instructions' : 'N/A'));
+    const finalEstimatedRestoration = isPlannedOrOperational(type)
+      ? (estimatedRestoration.trim() || 'N/A')
+      : 'N/A';
 
     const finalDistrict = (isTeamLeader || userRole === 'team_leader')
       ? (currentTeamLeader?.district || district || 'Team D')
@@ -1570,7 +1567,20 @@ export default function AdminPanel({
                   <select
                     id="form-type-select"
                     value={type}
-                    onChange={(e) => setType(e.target.value as InterruptionType)}
+                    onChange={(e) => {
+                      const newType = e.target.value as InterruptionType;
+                      setType(newType);
+                      if (isPlannedOrOperational(newType) && !estimatedRestoration) {
+                        const future = new Date(Date.now() + 3 * 60 * 60 * 1000);
+                        setEstimatedRestoration(future.toLocaleString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          hour12: true
+                        }));
+                      }
+                    }}
                     className="w-full text-xs rounded-xl glass-input p-2.5 text-gray-900 dark:text-white focus:outline-none focus:ring-1.5 focus:ring-eeu-green"
                   >
                     {Object.values(InterruptionType).map((t) => (
@@ -1598,13 +1608,7 @@ export default function AdminPanel({
 
               {/* Timing */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className={(
-                  type === InterruptionType.EARTH_FAULT || 
-                  type === InterruptionType.SHORT_CIRCUIT ||
-                  type === InterruptionType.DIFFERENTIAL ||
-                  type === InterruptionType.OVER_CURRENT ||
-                  type === InterruptionType.TOTAL_BLACKOUT
-                ) ? 'sm:col-span-2' : ''}>
+                <div className={!isPlannedOrOperational(type) ? 'sm:col-span-2' : ''}>
                   <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase font-mono tracking-wider mb-1.5">
                     Interruption Start Time
                   </label>
@@ -1618,17 +1622,17 @@ export default function AdminPanel({
                   />
                 </div>
 
-                {(type === InterruptionType.PLANNED_INTERRUPTION || type === InterruptionType.OPERATIONAL_INTERRUPTION || type === InterruptionType.SHEDDING || type === InterruptionType.LDC) && (
+                {isPlannedOrOperational(type) && (
                   <div>
                     <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase font-mono tracking-wider mb-1.5">
-                      {type === InterruptionType.LDC ? 'Est. Clearance / LDC Directive' : 'Estimated Restoration Time'}
+                      Estimated Restoration Time
                     </label>
                     <input
                       id="form-estimRestor-input"
                       type="text"
                       value={estimatedRestoration}
                       onChange={(e) => setEstimatedRestoration(e.target.value)}
-                      placeholder={type === InterruptionType.LDC ? "e.g. Until further LDC notice / Jun 19, 11:30 AM" : "e.g. Jun 19, 11:30 AM"}
+                      placeholder="e.g. Jun 19, 11:30 AM"
                       className="w-full text-xs rounded-xl glass-input p-2.5 text-gray-900 dark:text-white focus:outline-none focus:ring-1.5 focus:ring-eeu-green"
                     />
                   </div>

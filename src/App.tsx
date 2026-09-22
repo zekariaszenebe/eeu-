@@ -9,7 +9,7 @@ import {
 import { useInterruptions } from './context/InterruptionContext';
 
 // Types and mock data
-import { FeederInterruption, InterruptionType, InterruptionStatus, TeamLeaderNote, ContactItem, TeamLeaderUser, UserRole } from './types';
+import { FeederInterruption, InterruptionType, InterruptionStatus, TeamLeaderNote, ContactItem, TeamLeaderUser, UserRole, isPlannedOrOperational } from './types';
 import { INITIAL_INTERRUPTIONS, INITIAL_DISTRICTS, INITIAL_FEEDERS_LIST } from './data/mockData';
 import { FEEDERS_VERSION } from './data/feedersList';
 
@@ -323,7 +323,7 @@ export default function App() {
       type: pickedTypeObj.t,
       status: InterruptionStatus.ACTIVE,
       startTime: formatTime(now),
-      estimatedRestorationTime: formatTime(future),
+      estimatedRestorationTime: isPlannedOrOperational(pickedTypeObj.t) ? formatTime(future) : 'N/A',
       affectedArea: chosenArea,
       remark: pickedTypeObj.r
     });

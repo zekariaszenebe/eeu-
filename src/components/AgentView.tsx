@@ -8,7 +8,7 @@ import {
   Undo, Redo, Bold, Italic, Underline, Strikethrough, AlignLeft, AlignCenter, AlignRight, AlignJustify, Table, ChevronDown,
   Activity, Gauge, PowerOff, Server
 } from 'lucide-react';
-import { FeederInterruption, InterruptionType, InterruptionStatus, normalizeInterruptionType, stripBrackets, TeamLeaderNote } from '../types';
+import { FeederInterruption, InterruptionType, InterruptionStatus, normalizeInterruptionType, stripBrackets, TeamLeaderNote, isPlannedOrOperational } from '../types';
 import { INITIAL_DISTRICTS } from '../data/mockData';
 import { addTeamLeaderNoteDoc, updateTeamLeaderNoteDoc, deleteTeamLeaderNoteDoc, subscribeToInterruptions } from '../lib/firestoreService';
 import { LanguageMode, translateAmharicLocation, formatLocationDisplay } from '../utils/locationLanguage';
@@ -150,9 +150,7 @@ export function formatInterruptionShareText(item: FeederInterruption, lang: Lang
 
   const feeder = stripBrackets(item.feederName);
   const areas = lang === 'en' ? translateAmharicLocation(item.affectedArea) : item.affectedArea;
-  const estTime = (!item.estimatedRestorationTime || item.estimatedRestorationTime === 'N/A')
-    ? 'Line patrol & inspection in progress (TBD)'
-    : item.estimatedRestorationTime;
+  const showEstRestore = isPlannedOrOperational(item.type) && item.estimatedRestorationTime && item.estimatedRestorationTime !== 'N/A';
 
   return [
     `⚡ EEU FEEDER INTERRUPTION BULLETIN`,
@@ -161,7 +159,7 @@ export function formatInterruptionShareText(item: FeederInterruption, lang: Lang
     `⚠️ Interruption Type: ${typeDisplay}`,
     `📊 Status: ${item.status}`,
     `🕒 Start Time: ${item.startTime}`,
-    `⏳ Est. Restoration: ${estTime}`,
+    showEstRestore ? `⏳ Est. Restoration: ${item.estimatedRestorationTime}` : '',
     `🏘️ Affected Areas (${lang === 'en' ? 'English' : 'አማርኛ'}):`,
     `${areas}`,
     item.remark ? `📝 Dispatch Log: ${item.remark}` : '',
@@ -1254,15 +1252,10 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
                                       <span className="text-gray-400">Start Time:</span>
                                       <span className="text-gray-800 dark:text-gray-300">{item.startTime}</span>
                                     </div>
-                                    {item.estimatedRestorationTime && item.estimatedRestorationTime !== 'N/A' ? (
+                                    {isPlannedOrOperational(item.type) && item.estimatedRestorationTime && item.estimatedRestorationTime !== 'N/A' && (
                                       <div className="flex justify-between lg:justify-end gap-3">
                                         <span className="text-gray-400">Est. Restore:</span>
                                         <span className="text-eeu-green font-semibold">{item.estimatedRestorationTime}</span>
-                                      </div>
-                                    ) : (
-                                      <div className="flex justify-between lg:justify-end gap-3">
-                                        <span className="text-gray-400">Restoration:</span>
-                                        <span className="text-amber-500 font-medium text-[11px]">Patrol in progress</span>
                                       </div>
                                     )}
                                   </div>
@@ -1367,14 +1360,14 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
 
                               {/* Timing panel at bottom */}
                               <div className="mt-5 pt-3.5 border-t border-gray-100 dark:border-gray-800 grid grid-cols-2 gap-3 text-[11px]">
-                                <div className={(!item.estimatedRestorationTime || item.estimatedRestorationTime === 'N/A') ? 'col-span-2' : ''}>
+                                <div className={(!isPlannedOrOperational(item.type) || !item.estimatedRestorationTime || item.estimatedRestorationTime === 'N/A') ? 'col-span-2' : ''}>
                                   <div className="text-gray-400 dark:text-gray-500 flex items-center gap-1 font-semibold uppercase text-[9px]">
                                     <Clock className="w-3 h-3 text-gray-400" />
                                     <span>Start Time</span>
                                   </div>
                                   <span className="font-medium text-gray-700 dark:text-gray-300 block mt-0.5 font-mono">{item.startTime}</span>
                                 </div>
-                                {item.estimatedRestorationTime && item.estimatedRestorationTime !== 'N/A' && (
+                                {isPlannedOrOperational(item.type) && item.estimatedRestorationTime && item.estimatedRestorationTime !== 'N/A' && (
                                   <div>
                                     <div className="text-gray-400 dark:text-gray-500 flex items-center gap-1 font-semibold uppercase text-[9px]">
                                       <CalendarClock className="w-3.5 h-3.5 text-gray-400" />
@@ -1406,7 +1399,7 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
                       <tr className="border-b border-gray-100 dark:border-gray-800 text-[11px] font-sans font-bold text-gray-400 dark:text-gray-500 uppercase bg-gray-50/50 dark:bg-gray-950/20">
                         <th className="py-3.5 px-5">Feeder Station Details</th>
                         <th className="py-3.5 px-5">Interruption Cause</th>
-                        <th className="py-3.5 px-5">Timeline (Start / Restoration)</th>
+                        <th className="py-3.5 px-5">Timeline</th>
                         <th className="py-3.5 px-5 w-[460px]">Affected Location Area / Remarks</th>
                         <th className="py-3.5 px-5">Operational Status</th>
                       </tr>
@@ -1444,12 +1437,14 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
                                         <span className="text-[9px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-mono w-14">Start:</span>
                                         <span className="font-sans font-medium">{item.startTime}</span>
                                       </div>
-                                      <div className="flex items-center">
-                                        <span className="text-[9px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-mono w-14">Est. End:</span>
-                                        <span className="font-sans font-medium">
-                                          {(item.estimatedRestorationTime && item.estimatedRestorationTime !== 'N/A') ? item.estimatedRestorationTime : 'Patrol in progress'}
-                                        </span>
-                                      </div>
+                                      {isPlannedOrOperational(item.type) && item.estimatedRestorationTime && item.estimatedRestorationTime !== 'N/A' && (
+                                        <div className="flex items-center">
+                                          <span className="text-[9px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-mono w-14">Est. End:</span>
+                                          <span className="font-sans font-medium text-eeu-green">
+                                            {item.estimatedRestorationTime}
+                                          </span>
+                                        </div>
+                                      )}
                                     </div>
                                   </td>
                                   <td className="py-4 px-5 max-w-sm">

@@ -50,6 +50,11 @@ export function normalizeInterruptionType(raw: unknown): InterruptionType {
   return InterruptionType.EARTH_FAULT;
 }
 
+export function isPlannedOrOperational(raw: unknown): boolean {
+  const normalized = normalizeInterruptionType(raw);
+  return normalized === InterruptionType.PLANNED_INTERRUPTION || normalized === InterruptionType.OPERATIONAL_INTERRUPTION;
+}
+
 export enum InterruptionStatus {
   ACTIVE = 'Active',
   UNDER_INVESTIGATION = 'Partially Connected',
