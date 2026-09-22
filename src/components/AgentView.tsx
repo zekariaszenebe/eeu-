@@ -1358,11 +1358,11 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
                                   </div>
                                   
                                   {languageMode === 'en' ? (
-                                    <p className="font-sans text-[14px] text-gray-900 dark:text-gray-100 font-bold leading-relaxed">
+                                    <p className="font-sans text-[15.5px] text-gray-900 dark:text-gray-100 font-bold leading-relaxed">
                                       {translateAmharicLocation(item.affectedArea)}
                                     </p>
                                   ) : (
-                                    <p className="font-sans text-[14.5px] text-gray-900 dark:text-gray-100 font-bold leading-relaxed">
+                                    <p className="font-sans text-[15.5px] text-gray-900 dark:text-gray-100 font-bold leading-relaxed">
                                       {item.affectedArea}
                                     </p>
                                   )}
