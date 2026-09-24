@@ -1782,7 +1782,7 @@ export default function AdminPanel({
                 >
                   {DIRECTIONS.map((dir) => (
                     <option key={dir} value={dir}>
-                      {dir}
+                      {dir === 'Sheger Region' ? dir : `${dir} Addis Ababa`}
                     </option>
                   ))}
                 </select>

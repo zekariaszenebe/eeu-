@@ -1155,7 +1155,7 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
                   <div className="flex items-center gap-2.5">
                     <div>
                       <h3 className="font-display font-black text-gray-900 dark:text-white text-xl tracking-tight flex items-center gap-2">
-                        {dir}
+                        {dir === 'Sheger Region' ? dir : `${dir} Addis Ababa`}
                       </h3>
                     </div>
                   </div>
@@ -1413,7 +1413,7 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
                           <React.Fragment key={`table-dir-group-${dir}`}>
                             <tr className="bg-gray-100/50 dark:bg-gray-950/40 font-bold">
                               <td colSpan={5} className="py-3 px-5 text-xs text-gray-900 dark:text-gray-100 font-sans uppercase">
-                                ⚡ {dir.toUpperCase()} SECTOR OUTAGES ({itemsInDir.length})
+                                ⚡ {dir === 'Sheger Region' ? dir.toUpperCase() : `${dir.toUpperCase()} ADDIS ABABA`} SECTOR OUTAGES ({itemsInDir.length})
                               </td>
                             </tr>
                             {itemsInDir.map((item) => {
