@@ -430,7 +430,7 @@ export default function AdminPanel({
         setFeederFormError('A feeder line with this name already exists.');
         return;
       }
-      newList.push(combined);
+      newList.unshift(combined);
     }
 
     handleUpdateFeeders(newList);
