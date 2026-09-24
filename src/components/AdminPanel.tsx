@@ -9,7 +9,7 @@ import { INITIAL_DISTRICTS, INITIAL_FEEDERS_LIST } from '../data/mockData';
 import { InterruptionTypeBadge, getCardinalDirection } from './AgentView';
 import { LanguageMode, translateAmharicLocation, formatLocationDisplay } from '../utils/locationLanguage';
 
-export const DIRECTIONS = ['North', 'East', 'West', 'South', 'Sheger Region', 'North Addis Ababa', 'East Addis Ababa', 'West Addis Ababa', 'South Addis Ababa'];
+export const DIRECTIONS = ['North', 'East', 'West', 'South', 'Sheger Region'];
 
 // Helper to parse feeder name and its Amharic location details
 const parseFeeder = (feederStr: string) => {
@@ -925,11 +925,7 @@ export default function AdminPanel({
                         <div className="text-[11px] text-[#101828] dark:text-gray-300 flex items-center gap-1 font-semibold">
                           <MapPin className="w-3 h-3 text-gray-400" />
                           <span>
-                            {item.direction ? (item.direction === 'Sheger Region' ? item.direction : `${item.direction} Addis Ababa`) : 
-                              (() => {
-                                const dir = getCardinalDirection(item.district, item.feederName);
-                                return dir === 'Sheger Region' ? dir : `${dir} Addis Ababa`;
-                              })()}
+                            {item.direction || getCardinalDirection(item.district, item.feederName)}
                           </span>
                         </div>
                       </td>
@@ -1785,7 +1781,9 @@ export default function AdminPanel({
                   className="w-full text-xs rounded-xl glass-input p-2.5 text-gray-900 dark:text-white focus:outline-none focus:ring-1.5 focus:ring-eeu-green"
                 >
                   {DIRECTIONS.map((dir) => (
-                    <option key={dir} value={dir}>{dir} Addis Ababa</option>
+                    <option key={dir} value={dir}>
+                      {dir}
+                    </option>
                   ))}
                 </select>
               </div>

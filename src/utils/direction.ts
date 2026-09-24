@@ -1,4 +1,4 @@
-export type Direction = 'North' | 'East' | 'West' | 'South' | 'Sheger Region' | 'North Addis Ababa' | 'East Addis Ababa' | 'West Addis Ababa' | 'South Addis Ababa';
+export type Direction = 'North' | 'East' | 'West' | 'South' | 'Sheger Region';
 
 export function getCardinalDirection(district: string, feederName?: string): Direction {
   const f = (feederName || '');
@@ -8,7 +8,7 @@ export function getCardinalDirection(district: string, feederName?: string): Dir
     const parts = f.split('|').map(s => s.trim());
     if (parts.length >= 2) {
        const direction = parts[1];
-       if (['North', 'East', 'West', 'South', 'Sheger Region', 'North Addis Ababa', 'East Addis Ababa', 'West Addis Ababa', 'South Addis Ababa'].includes(direction)) {
+       if (['North', 'East', 'West', 'South', 'Sheger Region'].includes(direction)) {
          return direction as Direction;
        }
     }
@@ -83,7 +83,7 @@ export function getCardinalDirection(district: string, feederName?: string): Dir
     f.includes('AYT-') ||
     f.includes('BEL-02') || f.includes('BEL-04') ||
     f.includes('BLM-') ||
-    f.includes('COT-') ||
+    f.includes('COT-') || f.includes('CHK-1') ||
     f.includes('LEG-') ||
     f.includes('WER-') ||
     f.includes('COTEBE') ||
