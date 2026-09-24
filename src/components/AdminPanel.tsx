@@ -158,6 +158,7 @@ export default function AdminPanel({
   const [showTLModal, setShowTLModal] = useState(false);
   const [editingTL, setEditingTL] = useState<TeamLeaderUser | null>(null);
   const [tlName, setTlName] = useState('');
+  const [tlRole, setTlRole] = useState<UserRole>('team_leader');
   const [tlDistrict, setTlDistrict] = useState(INITIAL_DISTRICTS[0]);
   const [tlUsername, setTlUsername] = useState('');
   const [tlPassword, setTlPassword] = useState('');
@@ -171,6 +172,7 @@ export default function AdminPanel({
   const handleOpenAddTL = () => {
     setEditingTL(null);
     setTlName('');
+    setTlRole('team_leader');
     setTlDistrict(INITIAL_DISTRICTS[0]);
     setTlUsername('');
     setTlPassword('');
@@ -181,6 +183,7 @@ export default function AdminPanel({
   const handleOpenEditTL = (tl: TeamLeaderUser) => {
     setEditingTL(tl);
     setTlName(tl.name);
+    setTlRole(tl.role || 'team_leader');
     setTlDistrict(tl.district || INITIAL_DISTRICTS[0]);
     setTlUsername(tl.username);
     setTlPassword(tl.password);
@@ -221,6 +224,7 @@ export default function AdminPanel({
         onUpdateTeamLeader({
           ...editingTL,
           name: tlName.trim(),
+          role: tlRole,
           district: tlDistrict,
           username: cleanUser,
           password: tlPassword.trim()
@@ -230,6 +234,7 @@ export default function AdminPanel({
       if (onAddTeamLeader) {
         onAddTeamLeader({
           name: tlName.trim(),
+          role: tlRole,
           district: tlDistrict,
           username: cleanUser,
           password: tlPassword.trim()
@@ -1290,7 +1295,7 @@ export default function AdminPanel({
                         <td className="py-3.5 px-4">
                           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10.5px] font-bold bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20">
                             <Plus className="w-3 h-3" />
-                            <span>Add Interruption Only</span>
+                            <span>{tl.role ? tl.role.toUpperCase() : 'TEAM_LEADER'}</span>
                           </span>
                         </td>
                         <td className="py-3.5 px-4 text-right">
@@ -1882,6 +1887,21 @@ export default function AdminPanel({
                   onChange={(e) => setTlName(e.target.value)}
                   className="w-full px-3 py-2.5 rounded-xl border border-gray-200 dark:border-gray-800 bg-white/50 dark:bg-gray-900/50 text-xs text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-sky-500"
                 />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">
+                  Account Role
+                </label>
+                <select
+                  value={tlRole}
+                  onChange={(e) => setTlRole(e.target.value as UserRole)}
+                  className="w-full px-3 py-2.5 rounded-xl border border-gray-200 dark:border-gray-800 bg-white/50 dark:bg-gray-900/50 text-xs text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-sky-500 font-medium"
+                >
+                  <option value="admin">Admin</option>
+                  <option value="team_leader">Team Leader</option>
+                  <option value="agent">Agent</option>
+                </select>
               </div>
 
               <div>

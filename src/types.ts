@@ -105,6 +105,7 @@ export interface TeamLeaderUser {
   username: string;
   password: string;
   name: string;
+  role: UserRole;
   district?: string;
   mustChangePassword?: boolean;
   createdAt: string;
