@@ -1127,7 +1127,7 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
           {(() => {
             const directionsToRender = selectedDirection !== 'All' 
               ? [selectedDirection] 
-              : (['North', 'East', 'West', 'South', 'Sheger Region'] as const);
+              : (['North', 'East', 'West', 'South', 'Sheger Region', 'North Addis Ababa', 'East Addis Ababa', 'West Addis Ababa', 'South Addis Ababa'] as const);
 
             const renderDirHeader = (dir: string, count: number) => {
               let amStyle = "text-sky-600 bg-sky-500/10 dark:text-sky-400";
@@ -1155,7 +1155,7 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
                   <div className="flex items-center gap-2.5">
                     <div>
                       <h3 className="font-display font-black text-gray-900 dark:text-white text-xl tracking-tight flex items-center gap-2">
-                        {dir === 'Sheger Region' ? 'Sheger Region' : `${dir} Addis Ababa`}
+                        {dir === 'Sheger Region' || dir.includes('Addis Ababa') ? dir : `${dir} Addis Ababa`}
                       </h3>
                     </div>
                   </div>
@@ -1413,7 +1413,7 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
                           <React.Fragment key={`table-dir-group-${dir}`}>
                             <tr className="bg-gray-100/50 dark:bg-gray-950/40 font-bold">
                               <td colSpan={5} className="py-3 px-5 text-xs text-gray-900 dark:text-gray-100 font-sans uppercase">
-                                ⚡ {dir === 'Sheger Region' ? 'SHEGER REGION' : `${dir.toUpperCase()} ADDIS ABABA`} SECTOR OUTAGES ({itemsInDir.length})
+                                ⚡ {dir === 'Sheger Region' || dir.includes('Addis Ababa') ? dir.toUpperCase() : `${dir.toUpperCase()} ADDIS ABABA`} SECTOR OUTAGES ({itemsInDir.length})
                               </td>
                             </tr>
                             {itemsInDir.map((item) => {

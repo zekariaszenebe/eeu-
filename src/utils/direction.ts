@@ -1,4 +1,6 @@
-export function getCardinalDirection(district: string, feederName?: string): 'North' | 'East' | 'West' | 'South' | 'Sheger Region' {
+export type Direction = 'North' | 'East' | 'West' | 'South' | 'Sheger Region' | 'North Addis Ababa' | 'East Addis Ababa' | 'West Addis Ababa' | 'South Addis Ababa';
+
+export function getCardinalDirection(district: string, feederName?: string): Direction {
   const f = (feederName || '');
   
   // Try to parse from feeder name if it contains '|'
@@ -6,8 +8,8 @@ export function getCardinalDirection(district: string, feederName?: string): 'No
     const parts = f.split('|').map(s => s.trim());
     if (parts.length >= 2) {
        const direction = parts[1];
-       if (['North', 'East', 'West', 'South', 'Sheger Region'].includes(direction)) {
-         return direction as 'North' | 'East' | 'West' | 'South' | 'Sheger Region';
+       if (['North', 'East', 'West', 'South', 'Sheger Region', 'North Addis Ababa', 'East Addis Ababa', 'West Addis Ababa', 'South Addis Ababa'].includes(direction)) {
+         return direction as Direction;
        }
     }
   }
@@ -47,6 +49,7 @@ export function getCardinalDirection(district: string, feederName?: string): 'No
     f.includes('ADE-10') ||
     f.includes('ADW-01') || f.includes('ADW-03') || f.includes('ADW-04') || f.includes('ADW-05') || f.includes('ADW-06') || f.includes('ADW-07') || f.includes('ADW-08') || f.includes('ADW-09') || f.includes('ADW-10') || f.includes('ADW-11') || f.includes('ADW-12') ||
     f.includes('ANF-03') ||
+    f.includes('ALB-08') || f.includes('ALB-8') || f.includes('ALB-10') ||
     f.includes('BOL ARA-1') ||
     f.includes('BLL-01') || f.includes('BLL-03') || f.includes('BLL-06') || f.includes('BLL-07') || f.includes('BLL-09') || f.includes('BLL-10') || f.includes('BLL-11') || f.includes('BLL-12') || f.includes('BLL-4') ||
     f.includes('NIF-01') || f.includes('NIF-03') ||

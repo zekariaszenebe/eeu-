@@ -9,7 +9,7 @@ import { INITIAL_DISTRICTS, INITIAL_FEEDERS_LIST } from '../data/mockData';
 import { InterruptionTypeBadge, getCardinalDirection } from './AgentView';
 import { LanguageMode, translateAmharicLocation, formatLocationDisplay } from '../utils/locationLanguage';
 
-export const DIRECTIONS = ['North', 'East', 'West', 'South', 'Sheger Region'];
+export const DIRECTIONS = ['North', 'East', 'West', 'South', 'Sheger Region', 'North Addis Ababa', 'East Addis Ababa', 'West Addis Ababa', 'South Addis Ababa'];
 
 // Helper to parse feeder name and its Amharic location details
 const parseFeeder = (feederStr: string) => {
