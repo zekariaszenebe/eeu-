@@ -83,7 +83,7 @@ export function getCardinalDirection(district: string, feederName?: string): Dir
     f.includes('AYT-') ||
     f.includes('BEL-02') || f.includes('BEL-04') ||
     f.includes('BLM-') ||
-    f.includes('COT-') || f.includes('CHK-1') ||
+    f.includes('COT-') || f.includes('CHK-1') || f.includes('CHK-3') ||
     f.includes('LEG-') ||
     f.includes('WER-') ||
     f.includes('COTEBE') ||
