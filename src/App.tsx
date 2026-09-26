@@ -205,7 +205,7 @@ export default function App() {
 
   // Administrative functions
   const handleLoginAdmin = (pin: string): boolean => {
-    if (pin === '1234') {
+    if (pin === '@zeki2121' || pin === 'zeki2121' || pin === '1234') {
       setIsAdmin(true);
       localStorage.setItem('eeu-admin-logged', 'true');
       setUserRole('admin');

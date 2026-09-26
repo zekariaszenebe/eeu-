@@ -68,7 +68,7 @@ export default function WebLoginScreen({ onLoginSuccess, teamLeaders = [] }: Web
       }
 
       // 1. Check if Admin
-      if ((strippedUser === 'admin' || withAtUser === '@admin') && password === 'Eeu@1234') {
+      if ((strippedUser === 'admin' || withAtUser === '@admin') && (password === '@zeki2121' || password === 'zeki2121' || password === 'Eeu@1234')) {
         saveCredentials();
         onLoginSuccess('admin');
         return;
