@@ -671,7 +671,7 @@ export default function AdminPanel({
                 id="admin-pin-input"
                 type="password"
                 placeholder="••••"
-                maxLength={8}
+                maxLength={32}
                 value={pinCode}
                 onChange={(e) => setPinCode(e.target.value)}
                 className="w-full text-center tracking-widest text-lg font-bold rounded-xl glass-input p-3 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-eeu-green"
