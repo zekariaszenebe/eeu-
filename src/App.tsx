@@ -185,7 +185,7 @@ export default function App() {
           // channel?.postMessage({ type: 'SYNC_INTERRUPTIONS', data: items }); // Optional: only if broadcast channel is needed
           return items;
         });
-      }, userRole === 'agent');
+      }, false);
     });
 
     return () => {

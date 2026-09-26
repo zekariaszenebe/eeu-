@@ -113,6 +113,7 @@ export default function WebLoginScreen({ onLoginSuccess, teamLeaders = [] }: Web
           username: rawUser,
           password: 'Tl@1234',
           name: teamName,
+          role: 'team_leader',
           district: districtName,
           createdAt: new Date().toISOString()
         });

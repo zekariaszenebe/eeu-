@@ -137,6 +137,7 @@ export async function seedInitialDataIfEmpty() {
       username: '@team_a',
       password: 'Tl@1234',
       name: 'Team A Leader',
+      role: 'team_leader',
       district: 'Team A',
       createdAt: new Date().toISOString()
     },
@@ -145,6 +146,7 @@ export async function seedInitialDataIfEmpty() {
       username: '@team_b',
       password: 'Tl@1234',
       name: 'Team B Leader',
+      role: 'team_leader',
       district: 'Team B',
       createdAt: new Date().toISOString()
     },
@@ -153,6 +155,7 @@ export async function seedInitialDataIfEmpty() {
       username: '@team_c',
       password: 'Tl@1234',
       name: 'Team C Leader',
+      role: 'team_leader',
       district: 'Team C',
       createdAt: new Date().toISOString()
     },
@@ -161,6 +164,7 @@ export async function seedInitialDataIfEmpty() {
       username: '@team_d',
       password: 'Tl@1234',
       name: 'Zekarias Zenebe',
+      role: 'team_leader',
       district: 'Team D',
       createdAt: new Date().toISOString()
     }
@@ -182,7 +186,7 @@ export function subscribeToInterruptions(onUpdate: (items: FeederInterruption[])
   try {
     let q;
     if (onlyActive) {
-      q = query(interruptionsCol, where('status', '==', InterruptionStatus.ACTIVE), limit(50));
+      q = query(interruptionsCol, where('status', 'in', [InterruptionStatus.ACTIVE, InterruptionStatus.UNDER_INVESTIGATION]));
     } else {
       q = query(interruptionsCol);
     }
@@ -208,8 +212,10 @@ export function subscribeToInterruptions(onUpdate: (items: FeederInterruption[])
       });
       
       const sorted = [...list].sort((a, b) => {
-        if (a.status === InterruptionStatus.ACTIVE && b.status !== InterruptionStatus.ACTIVE) return -1;
-        if (a.status !== InterruptionStatus.ACTIVE && b.status === InterruptionStatus.ACTIVE) return 1;
+        const aRestored = a.status === InterruptionStatus.RESTORED;
+        const bRestored = b.status === InterruptionStatus.RESTORED;
+        if (!aRestored && bRestored) return -1;
+        if (aRestored && !bRestored) return 1;
         return (b.lastUpdated || '').localeCompare(a.lastUpdated || '');
       });
       
@@ -837,6 +843,7 @@ export function subscribeToTeamLeaders(onUpdate: (items: TeamLeaderUser[]) => vo
       username: '@team_a',
       password: 'Tl@1234',
       name: 'Team A Leader',
+      role: 'team_leader',
       district: 'Team A',
       createdAt: new Date().toISOString()
     },
@@ -845,6 +852,7 @@ export function subscribeToTeamLeaders(onUpdate: (items: TeamLeaderUser[]) => vo
       username: '@team_b',
       password: 'Tl@1234',
       name: 'Team B Leader',
+      role: 'team_leader',
       district: 'Team B',
       createdAt: new Date().toISOString()
     },
@@ -853,6 +861,7 @@ export function subscribeToTeamLeaders(onUpdate: (items: TeamLeaderUser[]) => vo
       username: '@team_c',
       password: 'Tl@1234',
       name: 'Team C Leader',
+      role: 'team_leader',
       district: 'Team C',
       createdAt: new Date().toISOString()
     },
@@ -861,6 +870,7 @@ export function subscribeToTeamLeaders(onUpdate: (items: TeamLeaderUser[]) => vo
       username: '@team_d',
       password: 'Tl@1234',
       name: 'Zekarias Zenebe',
+      role: 'team_leader',
       district: 'Team D',
       createdAt: new Date().toISOString()
     }
