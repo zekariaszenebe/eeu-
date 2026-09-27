@@ -20,7 +20,7 @@ export const TICKET_LANGUAGES: LanguageOption[] = [
 export function getComplaintSMSText(ticketId: string, lang: TicketLanguage): string {
   switch (lang) {
     case 'am':
-      return `ውድ ደበኛችን፣ የኣገልግሎት ጥያቄዎ የቲኬት መለያ ቁጥር ${ticketId} ተሰጥቶታል። በአጭር ጊዜ ውስጥ ባለሙያ ወደ እርሶ ይላካል። ለተጨማሪ ጥያቄዎች እባክዎን በ 905 የእርዳታ መስመራችን ላይ ይደውሉ።`;
+      return `ውድ ደንበኛችን፣ የአገልግሎት ጥያቄዎ የቲኬት መለያ ቁጥር ${ticketId} ተሰጥቶታል። በአጭር ጊዜ ውስጥ ባለሙያ ወደ እርሶ ይላካል። ለተጨማሪ ጥያቄዎች እባክዎን 905 ላይ ይደውሉ።`;
     case 'om':
       return `Kabajamoo maamila keenya, gaaffiin tajaajila keessanii Lakkoofsa Tiketti ${ticketId} kennameefiera. Ogeessi yeroo gabaabaa keessatti gara iddoo keessaniitti ni ergama. Odeeffannoo dabalataaf, maaloo sarara gargaarsa keenya 905 irratti bilbilaa.`;
     case 'ti':
@@ -34,7 +34,7 @@ export function getComplaintSMSText(ticketId: string, lang: TicketLanguage): str
 export function getTokenSMSText(token: string, lang: TicketLanguage): string {
   switch (lang) {
     case 'am':
-      return `ክቡር ደንበኛችን፤ የስማርት ሜትር ቶከን ቁጥርዎ፡ ${token} ነው። እባክዎ የኤሌክትሪክ አገልግሎትዎን ለመሙላት ቶከኑን በቆጣሪዎ ላይ ያስገቡ። ለተጨማሪ መረጃ በ905 ይደውሉ።`;
+      return `ውድ ደንበኛችን፤ የስማርት ሜትር ቶከን ቁጥርዎ፡ ${token} ነው። እባክዎ የኤሌክትሪክ አገልግሎትዎን ለመሙላት ቶከኑን ሪሞት ላይ ያስገቡ። ለተጨማሪ መረጃ በ905 ይደውሉ።`;
     case 'om':
       return `Kabajamaa maamila keenya, koodiin tookenii simaart meetirii keessanii: ${token} dha. Tajaajila elektirikii keessan guuttachuuf tookenicha meetirii keessan irratti galchaa. Odeeffannoo dabalataaf 905 irratti nuuf bilbilaa.`;
     case 'ti':
