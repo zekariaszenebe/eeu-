@@ -1,5 +1,49 @@
 import React, { useState } from 'react';
-import { MessageSquare, Copy, Check, AlertCircle, X } from 'lucide-react';
+import { MessageSquare, Copy, Check, AlertCircle, X, Languages, Globe } from 'lucide-react';
+
+export type TicketLanguage = 'am' | 'om' | 'ti' | 'en';
+
+export interface LanguageOption {
+  code: TicketLanguage;
+  name: string;
+  nativeName: string;
+  badge: string;
+}
+
+export const TICKET_LANGUAGES: LanguageOption[] = [
+  { code: 'en', name: 'English', nativeName: 'English', badge: 'English' },
+  { code: 'am', name: 'Amharic', nativeName: 'አማርኛ', badge: 'አማርኛ (Amharic)' },
+  { code: 'om', name: 'Afaan Oromoo', nativeName: 'Afaan Oromoo', badge: 'Afaan Oromoo' },
+  { code: 'ti', name: 'Tigrinya', nativeName: 'ትግርኛ', badge: 'ትግርኛ (Tigrinya)' },
+];
+
+export function getComplaintSMSText(ticketId: string, lang: TicketLanguage): string {
+  switch (lang) {
+    case 'am':
+      return `ውድ ደበኛችን፣ የኣገልግሎት ጥያቄዎ የቲኬት መለያ ቁጥር ${ticketId} ተሰጥቶታል። በአጭር ጊዜ ውስጥ ባለሙያ ወደ እርሶ ይላካል። ለተጨማሪ ጥያቄዎች እባክዎን በ 905 የእርዳታ መስመራችን ላይ ይደውሉ።`;
+    case 'om':
+      return `Kabajamoo maamila keenya, gaaffiin tajaajila keessanii Lakkoofsa Tiketti ${ticketId} kennameefiera. Ogeessi yeroo gabaabaa keessatti gara iddoo keessaniitti ni ergama. Odeeffannoo dabalataaf, maaloo sarara gargaarsa keenya 905 irratti bilbilaa.`;
+    case 'ti':
+      return `ዝኸበርካ ዓሚልና፡ ናይ ኣገልግሎት ሕቶኻ ናይ ቲኬት መለለዪ ቁፅሪ ${ticketId} ተዋሂብዎ ኣሎ። ኣብ ሕፅር ዝበለ እዋን ክኢላ ናብ ዘለኻዮ ቦታ ክልኣኽ እዩ። ንተወሳኺ ሕቶታት፡ ብበጃኻብ ብመስመር ሓገዝና 905 ደውሉ።`;
+    case 'en':
+    default:
+      return `Dear Customer, your service request has been assigned Ticket ID: ${ticketId}. A technician will be dispatched to your location shortly. For inquiries, please call our 905 helplines.`;
+  }
+}
+
+export function getTokenSMSText(token: string, lang: TicketLanguage): string {
+  switch (lang) {
+    case 'am':
+      return `ክቡር ደንበኛችን፤ የስማርት ሜትር ቶከን ቁጥርዎ፡ ${token} ነው። እባክዎ የኤሌክትሪክ አገልግሎትዎን ለመሙላት ቶከኑን በቆጣሪዎ ላይ ያስገቡ። ለተጨማሪ መረጃ በ905 ይደውሉ።`;
+    case 'om':
+      return `Kabajamaa maamila keenya, koodiin tookenii simaart meetirii keessanii: ${token} dha. Tajaajila elektirikii keessan guuttachuuf tookenicha meetirii keessan irratti galchaa. Odeeffannoo dabalataaf 905 irratti nuuf bilbilaa.`;
+    case 'ti':
+      return `ዝኸበርኩም ዓሚልና፤ ናይ ስማርት ሜትር ቶከን ቁጽርኹም: ${token} እዩ። ናይ መብራህቲ ኣገልግሎትኩም ንምምላእ ነቲ ቶከን ኣብ ቆጻሪኹም ኣእትውዎ። ንተወሳኺ ሓበሬታ ብ905 ደውሉልና።`;
+    case 'en':
+    default:
+      return `Dear Customer, your smart meter token number is: ${token}. Please enter the token into your meter to recharge your electricity service. For inquiries, please call our 905 helplines.`;
+  }
+}
 
 export default function SMSTickerGenerator() {
   const [complaintInput, setComplaintInput] = useState('');
@@ -7,13 +51,30 @@ export default function SMSTickerGenerator() {
   const [copiedComplaint, setCopiedComplaint] = useState(false);
   const [copiedToken, setCopiedToken] = useState(false);
 
+  // Multi-language states with persistent localStorage support (defaulting to English)
+  const [complaintLanguage, setComplaintLanguage] = useState<TicketLanguage>(() => {
+    const saved = localStorage.getItem('eeu-ticket-lang');
+    if (saved === 'am' || saved === 'om' || saved === 'ti' || saved === 'en') {
+      return saved;
+    }
+    return 'en';
+  });
+
+  const [tokenLanguage, setTokenLanguage] = useState<TicketLanguage>(() => {
+    const saved = localStorage.getItem('eeu-token-lang');
+    if (saved === 'am' || saved === 'om' || saved === 'ti' || saved === 'en') {
+      return saved;
+    }
+    return 'en';
+  });
+
   // 1. Complaint / Ticket Number logic (10 numeric digits)
   const rawComplaintDigits = complaintInput.replace(/\D/g, '').slice(0, 10);
   const isComplaintEntered = complaintInput.trim().length > 0;
   const isComplaintValid = rawComplaintDigits.length === 10;
 
   const complaintPreviewText = isComplaintValid
-    ? `Dear Customer, your service request has been assigned Ticket ID: ${rawComplaintDigits}. A technician will be dispatched to your location shortly. For inquiries, please call our 905 helplines.`
+    ? getComplaintSMSText(rawComplaintDigits, complaintLanguage)
     : null;
 
   // 2. Smart Meter Token Recharge logic (20 numeric digits)
@@ -33,7 +94,7 @@ export default function SMSTickerGenerator() {
   const formattedToken = isTokenValid ? formatTokenGroups(rawTokenDigits) : '';
 
   const tokenPreviewText = isTokenValid
-    ? `Dear Customer, your smart meter token number is: ${formattedToken}. Please enter the token into your meter to recharge your electricity service. For inquiries, please call our 905 helplines.`
+    ? getTokenSMSText(formattedToken, tokenLanguage)
     : null;
 
   const handleCopyComplaint = () => {
@@ -49,6 +110,9 @@ export default function SMSTickerGenerator() {
     setCopiedToken(true);
     setTimeout(() => setCopiedToken(false), 2000);
   };
+
+  const currentComplaintLangObj = TICKET_LANGUAGES.find(l => l.code === complaintLanguage) || TICKET_LANGUAGES[0];
+  const currentTokenLangObj = TICKET_LANGUAGES.find(l => l.code === tokenLanguage) || TICKET_LANGUAGES[0];
 
   return (
     <div id="sms-ticket-generator-view" className="w-full pb-8">
@@ -140,21 +204,61 @@ export default function SMSTickerGenerator() {
               ) : null}
             </div>
 
-            {/* SMS Preview Section */}
+            {/* Language Selection Header & Tabs */}
             <div className="mt-5 space-y-2">
-              <label className="block text-xs font-semibold text-gray-800 dark:text-zinc-200">
-                SMS Preview
-              </label>
-              <div className="border border-dashed border-gray-300 dark:border-zinc-700 bg-gray-50/60 dark:bg-zinc-900/40 rounded-xl p-5 min-h-[110px] flex items-center justify-center text-center">
-                {complaintPreviewText ? (
-                  <p className="text-xs sm:text-sm text-gray-800 dark:text-zinc-100 font-sans leading-relaxed text-left select-all">
-                    {complaintPreviewText}
-                  </p>
-                ) : (
-                  <p className="text-xs text-gray-400 dark:text-zinc-500 italic font-sans">
-                    Enter a 10-digit ticket number above to generate the customer SMS message.
-                  </p>
-                )}
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-800 dark:text-zinc-200">
+                  <Languages className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                  <span>Ticket Language</span>
+                </div>
+                {/* Language Switcher Buttons */}
+                <div className="inline-flex items-center p-0.5 bg-gray-100 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl">
+                  {TICKET_LANGUAGES.map((lang) => {
+                    const isSelected = complaintLanguage === lang.code;
+                    return (
+                      <button
+                        key={`ticket-lang-${lang.code}`}
+                        id={`ticket-lang-btn-${lang.code}`}
+                        type="button"
+                        onClick={() => {
+                          setComplaintLanguage(lang.code);
+                          try {
+                            localStorage.setItem('eeu-ticket-lang', lang.code);
+                          } catch {}
+                        }}
+                        className={`px-2.5 py-1 text-[11px] font-medium rounded-lg transition-all cursor-pointer ${
+                          isSelected
+                            ? 'bg-[#078930] text-white font-bold shadow-xs'
+                            : 'text-gray-600 dark:text-zinc-400 hover:text-gray-900 dark:hover:text-zinc-200'
+                        }`}
+                        title={lang.name}
+                      >
+                        {lang.nativeName}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* SMS Preview Section */}
+              <div className="mt-3 space-y-1.5">
+                <div className="flex items-center justify-between text-[11px] text-gray-500 dark:text-zinc-400">
+                  <span className="font-semibold text-gray-700 dark:text-zinc-300">SMS Preview</span>
+                  <span className="font-medium text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-md border border-emerald-200/50 dark:border-emerald-900/40">
+                    {currentComplaintLangObj.badge}
+                  </span>
+                </div>
+                <div className="border border-dashed border-gray-300 dark:border-zinc-700 bg-gray-50/60 dark:bg-zinc-900/40 rounded-xl p-4 sm:p-5 min-h-[110px] flex items-center justify-center text-center">
+                  {complaintPreviewText ? (
+                    <p className="text-xs sm:text-sm text-gray-800 dark:text-zinc-100 font-sans leading-relaxed text-left select-all">
+                      {complaintPreviewText}
+                    </p>
+                  ) : (
+                    <p className="text-xs text-gray-400 dark:text-zinc-500 italic font-sans">
+                      Enter a 10-digit ticket number above to generate the customer SMS message in {currentComplaintLangObj.name}.
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -175,12 +279,12 @@ export default function SMSTickerGenerator() {
               {copiedComplaint ? (
                 <>
                   <Check className="w-4 h-4 text-white" />
-                  <span>Copied to Clipboard!</span>
+                  <span>Copied to Clipboard! ({currentComplaintLangObj.nativeName})</span>
                 </>
               ) : (
                 <>
                   <Copy className="w-4 h-4 text-gray-400 dark:text-zinc-500 group-hover:text-gray-600" />
-                  <span>Copy SMS</span>
+                  <span>Copy SMS ({currentComplaintLangObj.nativeName})</span>
                 </>
               )}
             </button>
@@ -272,21 +376,61 @@ export default function SMSTickerGenerator() {
               ) : null}
             </div>
 
-            {/* SMS Preview Section */}
+            {/* Language Selection Header & Tabs */}
             <div className="mt-5 space-y-2">
-              <label className="block text-xs font-semibold text-gray-800 dark:text-zinc-200">
-                SMS Preview
-              </label>
-              <div className="border border-dashed border-gray-300 dark:border-zinc-700 bg-gray-50/60 dark:bg-zinc-900/40 rounded-xl p-5 min-h-[110px] flex items-center justify-center text-center">
-                {tokenPreviewText ? (
-                  <p className="text-xs sm:text-sm text-gray-800 dark:text-zinc-100 font-sans leading-relaxed text-left select-all">
-                    {tokenPreviewText}
-                  </p>
-                ) : (
-                  <p className="text-xs text-gray-400 dark:text-zinc-500 italic font-sans">
-                    Enter a 20-digit token number above to generate the customer recharge SMS.
-                  </p>
-                )}
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-800 dark:text-zinc-200">
+                  <Languages className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" />
+                  <span>Token Language</span>
+                </div>
+                {/* Language Switcher Buttons */}
+                <div className="inline-flex items-center p-0.5 bg-gray-100 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl">
+                  {TICKET_LANGUAGES.map((lang) => {
+                    const isSelected = tokenLanguage === lang.code;
+                    return (
+                      <button
+                        key={`token-lang-${lang.code}`}
+                        id={`token-lang-btn-${lang.code}`}
+                        type="button"
+                        onClick={() => {
+                          setTokenLanguage(lang.code);
+                          try {
+                            localStorage.setItem('eeu-token-lang', lang.code);
+                          } catch {}
+                        }}
+                        className={`px-2.5 py-1 text-[11px] font-medium rounded-lg transition-all cursor-pointer ${
+                          isSelected
+                            ? 'bg-sky-600 text-white font-bold shadow-xs'
+                            : 'text-gray-600 dark:text-zinc-400 hover:text-gray-900 dark:hover:text-zinc-200'
+                        }`}
+                        title={lang.name}
+                      >
+                        {lang.nativeName}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* SMS Preview Section */}
+              <div className="mt-3 space-y-1.5">
+                <div className="flex items-center justify-between text-[11px] text-gray-500 dark:text-zinc-400">
+                  <span className="font-semibold text-gray-700 dark:text-zinc-300">SMS Preview</span>
+                  <span className="font-medium text-sky-700 dark:text-sky-400 bg-sky-50 dark:bg-sky-950/40 px-2 py-0.5 rounded-md border border-sky-200/50 dark:border-sky-900/40">
+                    {currentTokenLangObj.badge}
+                  </span>
+                </div>
+                <div className="border border-dashed border-gray-300 dark:border-zinc-700 bg-gray-50/60 dark:bg-zinc-900/40 rounded-xl p-4 sm:p-5 min-h-[110px] flex items-center justify-center text-center">
+                  {tokenPreviewText ? (
+                    <p className="text-xs sm:text-sm text-gray-800 dark:text-zinc-100 font-sans leading-relaxed text-left select-all">
+                      {tokenPreviewText}
+                    </p>
+                  ) : (
+                    <p className="text-xs text-gray-400 dark:text-zinc-500 italic font-sans">
+                      Enter a 20-digit token number above to generate the customer recharge SMS in {currentTokenLangObj.name}.
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -307,12 +451,12 @@ export default function SMSTickerGenerator() {
               {copiedToken ? (
                 <>
                   <Check className="w-4 h-4 text-white" />
-                  <span>Copied to Clipboard!</span>
+                  <span>Copied to Clipboard! ({currentTokenLangObj.nativeName})</span>
                 </>
               ) : (
                 <>
                   <Copy className="w-4 h-4 text-gray-400 dark:text-zinc-500 group-hover:text-gray-600" />
-                  <span>Copy SMS</span>
+                  <span>Copy SMS ({currentTokenLangObj.nativeName})</span>
                 </>
               )}
             </button>
