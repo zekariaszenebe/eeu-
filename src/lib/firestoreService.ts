@@ -188,7 +188,8 @@ export function subscribeToInterruptions(onUpdate: (items: FeederInterruption[])
     if (onlyActive) {
       q = query(interruptionsCol, where('status', 'in', [InterruptionStatus.ACTIVE, InterruptionStatus.UNDER_INVESTIGATION]));
     } else {
-      q = query(interruptionsCol);
+      // Limit to 150 records to prevent unbounded historical document reads
+      q = query(interruptionsCol, limit(150));
     }
     return onSnapshot(q, (snapshot) => {
       const list: FeederInterruption[] = [];
@@ -236,56 +237,37 @@ export function subscribeToInterruptions(onUpdate: (items: FeederInterruption[])
   }
 }
 
+/**
+ * Subscribes to preset feeders using a single consolidated configuration document
+ * in 'systemSettings/presetFeeders'. This reduces document reads from ~248 reads to 1 read.
+ */
 export function subscribeToFeedersList(onUpdate: (items: string[]) => void) {
   try {
-    return onSnapshot(presetFeedersCol, (snapshot) => {
-      const combined = [...INITIAL_FEEDERS_LIST];
-      if (!snapshot.empty) {
-        snapshot.forEach((doc) => {
-          const data = doc.data();
-          if (data.feederStr && !combined.includes(data.feederStr)) {
-            combined.push(data.feederStr);
-          }
-        });
-      }
-      
-      const localCached = getLocal<string[]>('eeu-feeders-list-v4', []);
-      if (Array.isArray(localCached)) {
-        for (const item of localCached) {
-          if (item && !combined.includes(item)) {
-            combined.push(item);
-          }
+    const configDocRef = doc(db, 'systemSettings', 'presetFeeders');
+    return onSnapshot(configDocRef, (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        if (Array.isArray(data.list) && data.list.length > 0) {
+          const list = [...data.list].sort();
+          setLocal('eeu-feeders-list-v4', list);
+          onUpdate(list);
+          return;
         }
       }
 
-      combined.sort();
-      onUpdate(combined);
+      // If document doesn't exist yet, seed it once to save reads for all future clients
+      const localCached = getLocal<string[]>('eeu-feeders-list-v4', INITIAL_FEEDERS_LIST);
+      const sorted = [...localCached].sort();
+      onUpdate(sorted);
+      setDoc(configDocRef, { list: sorted }).catch(() => {});
     }, (err) => {
-      handleFirestoreError(err, OperationType.GET, 'presetFeeders');
+      handleFirestoreError(err, OperationType.GET, 'systemSettings/presetFeeders');
       const cached = getLocal<string[]>('eeu-feeders-list-v4', INITIAL_FEEDERS_LIST);
-      const mergedCached = [...INITIAL_FEEDERS_LIST];
-      if (Array.isArray(cached)) {
-        for (const item of cached) {
-          if (item && !mergedCached.includes(item)) {
-            mergedCached.push(item);
-          }
-        }
-      }
-      mergedCached.sort();
-      onUpdate(mergedCached);
+      onUpdate(cached);
     });
   } catch {
     const cached = getLocal<string[]>('eeu-feeders-list-v4', INITIAL_FEEDERS_LIST);
-    const mergedCached = [...INITIAL_FEEDERS_LIST];
-    if (Array.isArray(cached)) {
-      for (const item of cached) {
-        if (item && !mergedCached.includes(item)) {
-          mergedCached.push(item);
-        }
-      }
-    }
-    mergedCached.sort();
-    onUpdate(mergedCached);
+    onUpdate(cached);
     return () => {};
   }
 }
@@ -441,105 +423,65 @@ export async function deleteInterruptionDoc(id: string) {
  */
 export async function addPresetFeederDoc(feederStr: string) {
   const localFeeders = getLocal<string[]>('eeu-feeders-list-v4', INITIAL_FEEDERS_LIST);
-  if (!localFeeders.includes(feederStr)) {
-    const updated = [...localFeeders, feederStr].sort();
+  let updated = [...localFeeders];
+  if (!updated.includes(feederStr)) {
+    updated.push(feederStr);
+    updated.sort();
     setLocal('eeu-feeders-list-v4', updated);
   }
 
-
-  const cleanId = 'feeder-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6);
   try {
-    await setDoc(doc(db, 'presetFeeders', cleanId), { feederStr });
+    const configDocRef = doc(db, 'systemSettings', 'presetFeeders');
+    await setDoc(configDocRef, { list: updated }, { merge: true });
   } catch (error) {
-    handleFirestoreError(error, OperationType.CREATE, `presetFeeders/${cleanId}`);
+    handleFirestoreError(error, OperationType.CREATE, 'systemSettings/presetFeeders');
   }
 }
 
 /**
- * Deletes a preset feeder line.
+ * Deletes a preset feeder line using single consolidated document (0 extra reads).
  */
 export async function deletePresetFeederDoc(feederStr: string) {
   const localFeeders = getLocal<string[]>('eeu-feeders-list-v4', INITIAL_FEEDERS_LIST);
-  setLocal('eeu-feeders-list-v4', localFeeders.filter(f => f !== feederStr));
-
+  const updated = localFeeders.filter(f => f !== feederStr).sort();
+  setLocal('eeu-feeders-list-v4', updated);
 
   try {
-    const q = query(presetFeedersCol);
-    const snapshot = await getDocs(q);
-    const batch = writeBatch(db);
-    let deletedCount = 0;
-    snapshot.forEach((doc) => {
-      if (doc.data().feederStr === feederStr) {
-        batch.delete(doc.ref);
-        deletedCount++;
-      }
-    });
-    if (deletedCount > 0) {
-      await batch.commit();
-    }
+    const configDocRef = doc(db, 'systemSettings', 'presetFeeders');
+    await setDoc(configDocRef, { list: updated }, { merge: true });
   } catch (error) {
-    handleFirestoreError(error, OperationType.DELETE, 'presetFeeders');
+    handleFirestoreError(error, OperationType.DELETE, 'systemSettings/presetFeeders');
   }
 }
 
 /**
- * Updates a preset feeder line.
+ * Updates a preset feeder line using single consolidated document (0 extra reads).
  */
 export async function updatePresetFeederDoc(oldFeederStr: string, newFeederStr: string) {
   const localFeeders = getLocal<string[]>('eeu-feeders-list-v4', INITIAL_FEEDERS_LIST);
-  setLocal('eeu-feeders-list-v4', localFeeders.map(f => f === oldFeederStr ? newFeederStr : f).sort());
-
+  const updated = localFeeders.map(f => f === oldFeederStr ? newFeederStr : f).sort();
+  setLocal('eeu-feeders-list-v4', updated);
 
   try {
-    const q = query(presetFeedersCol);
-    const snapshot = await getDocs(q);
-    const batch = writeBatch(db);
-    let updatedCount = 0;
-    snapshot.forEach((doc) => {
-      if (doc.data().feederStr === oldFeederStr) {
-        batch.update(doc.ref, { feederStr: newFeederStr });
-        updatedCount++;
-      }
-    });
-    if (updatedCount > 0) {
-      await batch.commit();
-    }
+    const configDocRef = doc(db, 'systemSettings', 'presetFeeders');
+    await setDoc(configDocRef, { list: updated }, { merge: true });
   } catch (error) {
-    handleFirestoreError(error, OperationType.UPDATE, 'presetFeeders');
+    handleFirestoreError(error, OperationType.UPDATE, 'systemSettings/presetFeeders');
   }
 }
 
 /**
- * Resets and overwrites all preset feeders in Firestore with the complete 248 master feeder database.
+ * Resets and overwrites preset feeders with the complete 248 master list in a single write.
  */
 export async function resetAllPresetFeedersToMaster() {
   setLocal('eeu-feeders-list-v4', INITIAL_FEEDERS_LIST);
   setLocal('eeu-feeders-version', FEEDERS_VERSION);
 
-
   try {
-    const feedersSnap = await getDocs(presetFeedersCol);
-    const existingDocs = feedersSnap.docs;
-    
-    // Clear old docs
-    for (let i = 0; i < existingDocs.length; i += 450) {
-      const batch = writeBatch(db);
-      existingDocs.slice(i, i + 450).forEach((d) => batch.delete(d.ref));
-      await batch.commit();
-    }
-
-    // Set full 248 master list
-    for (let i = 0; i < INITIAL_FEEDERS_LIST.length; i += 450) {
-      const batch = writeBatch(db);
-      INITIAL_FEEDERS_LIST.slice(i, i + 450).forEach((feederStr, index) => {
-        const docId = `feeder-${i + index}`;
-        const docRef = doc(db, 'presetFeeders', docId);
-        batch.set(docRef, { feederStr });
-      });
-      await batch.commit();
-    }
+    const configDocRef = doc(db, 'systemSettings', 'presetFeeders');
+    await setDoc(configDocRef, { list: INITIAL_FEEDERS_LIST });
   } catch (error) {
-    handleFirestoreError(error, OperationType.WRITE, 'presetFeeders');
+    handleFirestoreError(error, OperationType.WRITE, 'systemSettings/presetFeeders');
   }
 }
 

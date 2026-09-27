@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { FeederInterruption, InterruptionType, InterruptionStatus, normalizeInterruptionType, stripBrackets, TeamLeaderNote, isPlannedOrOperational } from '../types';
 import { INITIAL_DISTRICTS } from '../data/mockData';
-import { addTeamLeaderNoteDoc, updateTeamLeaderNoteDoc, deleteTeamLeaderNoteDoc, subscribeToInterruptions } from '../lib/firestoreService';
+import { addTeamLeaderNoteDoc, updateTeamLeaderNoteDoc, deleteTeamLeaderNoteDoc } from '../lib/firestoreService';
 import { LanguageMode, translateAmharicLocation, formatLocationDisplay } from '../utils/locationLanguage';
 import { getCardinalDirection } from '../utils/direction';
 export { getCardinalDirection };
@@ -176,24 +176,8 @@ interface AgentViewProps {
 }
 
 export default function AgentView({ interruptions, onTriggerMockIncident, isAdmin = false, teamLeaderNotes = [] }: AgentViewProps) {
-  // Real-time interruptions state listener via onSnapshot
-  const [liveInterruptions, setLiveInterruptions] = useState<FeederInterruption[]>(interruptions || []);
-
-  useEffect(() => {
-    if (interruptions) {
-      setLiveInterruptions(interruptions);
-    }
-  }, [interruptions]);
-
-  useEffect(() => {
-    const unsubscribe = subscribeToInterruptions((items) => {
-      setLiveInterruptions(items);
-    });
-
-    return () => {
-      unsubscribe();
-    };
-  }, []);
+  // Direct state from the single root InterruptionContext subscription (eliminates duplicate Firestore reads)
+  const liveInterruptions = interruptions || [];
 
   // Filters & Search controls
   const [searchQuery, setSearchQuery] = useState('');

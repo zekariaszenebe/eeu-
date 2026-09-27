@@ -1,6 +1,12 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { getFirestore, enableNetwork, setLogLevel } from 'firebase/firestore';
+import { 
+  initializeFirestore, 
+  persistentLocalCache, 
+  persistentMultipleTabManager, 
+  enableNetwork, 
+  setLogLevel 
+} from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 // Silence verbose internal Firestore backoff retry logs
@@ -12,8 +18,16 @@ try {
 
 const app = initializeApp(firebaseConfig);
 
-// Initialize Firestore with custom database ID from config
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+// Initialize Firestore with custom database ID from config and multi-tab offline cache
+export const db = initializeFirestore(
+  app,
+  {
+    localCache: persistentLocalCache({
+      tabManager: persistentMultipleTabManager()
+    })
+  },
+  firebaseConfig.firestoreDatabaseId
+);
 export const auth = getAuth(app);
 
 // Always ensure the network is active on startup and clear any stale quota exhaustion flags

@@ -16,7 +16,6 @@ import { FEEDERS_VERSION } from './data/feedersList';
 // Firestore Services
 import { 
   seedInitialDataIfEmpty,
-  subscribeToInterruptions,
   subscribeToFeedersList,
   addInterruptionDoc,
   updateInterruptionDoc,
@@ -150,7 +149,6 @@ export default function App() {
     let unsubNotes = () => {};
     let unsubCustomerContacts = () => {};
     let unsubTeamLeaders = () => {};
-    let unsub = () => {};
 
     seedInitialDataIfEmpty().then(() => {
       unsubFeeders = subscribeToFeedersList((items) => {
@@ -170,22 +168,6 @@ export default function App() {
       unsubTeamLeaders = subscribeToTeamLeaders((items) => {
         setTeamLeaders(items);
       });
-      unsub = subscribeToInterruptions((items) => {
-        // Only trigger update if length or items are modified
-        setInterruptions(prev => {
-          const serializedPrev = JSON.stringify(prev);
-          const serializedNext = JSON.stringify(items);
-          if (serializedPrev === serializedNext) return prev;
-          
-          try {
-            localStorage.setItem('eeu-interruptions', serializedNext);
-          } catch (e) {
-            console.error('Failed to write Firestore updates to localStorage', e);
-          }
-          // channel?.postMessage({ type: 'SYNC_INTERRUPTIONS', data: items }); // Optional: only if broadcast channel is needed
-          return items;
-        });
-      }, false);
     });
 
     return () => {
@@ -194,7 +176,6 @@ export default function App() {
       unsubNotes();
       unsubCustomerContacts();
       unsubTeamLeaders();
-      unsub();
     };
   }, [userRole]);
 
