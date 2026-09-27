@@ -23,8 +23,8 @@ export default function StatsGrid({ interruptions }: StatsGridProps) {
     i => i.status !== InterruptionStatus.RESTORED && normalizeInterruptionType(i.type) === InterruptionType.OVER_CURRENT
   ).length;
 
-  const ldcOutages = interruptions.filter(
-    i => i.status !== InterruptionStatus.RESTORED && normalizeInterruptionType(i.type) === InterruptionType.LDC
+  const sheddingAndLdc = interruptions.filter(
+    i => i.status !== InterruptionStatus.RESTORED && (normalizeInterruptionType(i.type) === InterruptionType.SHEDDING || normalizeInterruptionType(i.type) === InterruptionType.LDC)
   ).length;
 
   const planned = interruptions.filter(
@@ -56,10 +56,10 @@ export default function StatsGrid({ interruptions }: StatsGridProps) {
     },
     {
       id: "stat-overcurrent-ldc",
-      title: "Over Current & LDC",
-      value: overCurrents + ldcOutages,
+      title: "Over Current & Shedding",
+      value: overCurrents + sheddingAndLdc,
       textColor: "text-teal-600 dark:text-teal-400 font-bold",
-      subtext: `${overCurrents} Over Current · ${ldcOutages} LDC Directive`,
+      subtext: `${overCurrents} Over Current · ${sheddingAndLdc} Shedding`,
       icon: Gauge,
       iconBg: "bg-teal-50 dark:bg-teal-950/40 border border-teal-200/70 dark:border-teal-900/40 shadow-xs",
       iconColor: "text-teal-600 dark:text-teal-400",
