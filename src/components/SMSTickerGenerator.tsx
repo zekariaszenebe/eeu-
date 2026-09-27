@@ -36,7 +36,7 @@ export function getTokenSMSText(token: string, lang: TicketLanguage): string {
     case 'am':
       return `ውድ ደንበኛችን፤ የስማርት ሜትር ቶከን ቁጥርዎ፡ ${token} ነው። እባክዎ የኤሌክትሪክ አገልግሎትዎን ለመሙላት ቶከኑን ሪሞት ላይ ያስገቡ። ለተጨማሪ መረጃ በ905 ይደውሉ።`;
     case 'om':
-      return `Kabajamaa/too maamila keenya, lakkoofsi tokeenii ismaart meetira keessaniif: ${token} dha. Tajaajila elektriikii keessan guuttachuuf maaloo tokeenichaa ሪሞት (remote) irratti galchaa. Odeeffannoo dabalataatiif 905 irratti bilbilaa.`;
+      return `Kabajamaa maamila keenya, lakkoofsi tokeenii ismaart meetira keessaniif: ${token} dha. Tajaajila elektriikii keessan guuttachuuf maaloo tokeenichaa Rimootii irratti galchaa. Odeeffannoo dabalataatiif 905 irratti bilbilaa.`;
     case 'ti':
       return `ክቡር ደንበኛና፣ ናይ ስማርት ሜተር ቶከን ቁፅርኹም፡ ${token} እዩ። ብበጃኹም ናይ ኤሌክትሪክ ኣገልግሎትኹም ንምምላእ ቶከን ኣብ ሪሞት የእትዉ። ንተወሳኺ ሓበሬታ ብ 905 ደውሉ።`;
     case 'en':
