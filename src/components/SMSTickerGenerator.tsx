@@ -22,9 +22,9 @@ export function getComplaintSMSText(ticketId: string, lang: TicketLanguage): str
     case 'am':
       return `ውድ ደንበኛችን፣ የአገልግሎት ጥያቄዎ የቲኬት መለያ ቁጥር ${ticketId} ተሰጥቶታል። በአጭር ጊዜ ውስጥ ባለሙያ ወደ እርሶ ይላካል። ለተጨማሪ ጥያቄዎች እባክዎን 905 ላይ ይደውሉ።`;
     case 'om':
-      return `Kabajamoo maamila keenya, gaaffiin tajaajila keessanii Lakkoofsa Tiketti ${ticketId} kennameefiera. Ogeessi yeroo gabaabaa keessatti gara iddoo keessaniitti ni ergama. Odeeffannoo dabalataaf, maaloo sarara gargaarsa keenya 905 irratti bilbilaa.`;
+      return `Kabajamaa/too maamila keenya, gaaffii tajaajila keessaniif lakkoofsi teekee ${ticketId} kennameera. Yeroo gabaabaa keessatti ogessaan gara keessaniitti ni ergama. Gaaffii dabalataatiif maaloo 905 irratti bilbilaa.`;
     case 'ti':
-      return `ዝኸበርካ ዓሚልና፡ ናይ ኣገልግሎት ሕቶኻ ናይ ቲኬት መለለዪ ቁፅሪ ${ticketId} ተዋሂብዎ ኣሎ። ኣብ ሕፅር ዝበለ እዋን ክኢላ ናብ ዘለኻዮ ቦታ ክልኣኽ እዩ። ንተወሳኺ ሕቶታት፡ ብበጃኻብ ብመስመር ሓገዝና 905 ደውሉ።`;
+      return `ክቡር ደንበኛና፣ ናይ ኣገልግሎት ሕቶኹም ናይ ቲኬት ቁፅሪ ${ticketId} ተዋሂብዎ ኣሎ። ኣብ ሓጺር እዋን ሰብ ሞያ ናብ እትረክብሉ ቦታ ክልኣኽ እዩ። ንተወሳኺ ሕቶታት ብበጃኹም ብ 905 ደውሉ።`;
     case 'en':
     default:
       return `Dear Customer, your service request has been assigned Ticket ID: ${ticketId}. A technician will be dispatched to your location shortly. For inquiries, please call our 905 helplines.`;
@@ -36,9 +36,9 @@ export function getTokenSMSText(token: string, lang: TicketLanguage): string {
     case 'am':
       return `ውድ ደንበኛችን፤ የስማርት ሜትር ቶከን ቁጥርዎ፡ ${token} ነው። እባክዎ የኤሌክትሪክ አገልግሎትዎን ለመሙላት ቶከኑን ሪሞት ላይ ያስገቡ። ለተጨማሪ መረጃ በ905 ይደውሉ።`;
     case 'om':
-      return `Kabajamaa maamila keenya, koodiin tookenii simaart meetirii keessanii: ${token} dha. Tajaajila elektirikii keessan guuttachuuf tookenicha meetirii keessan irratti galchaa. Odeeffannoo dabalataaf 905 irratti nuuf bilbilaa.`;
+      return `Kabajamaa/too maamila keenya, lakkoofsi tokeenii ismaart meetira keessaniif: ${token} dha. Tajaajila elektriikii keessan guuttachuuf maaloo tokeenichaa ሪሞት (remote) irratti galchaa. Odeeffannoo dabalataatiif 905 irratti bilbilaa.`;
     case 'ti':
-      return `ዝኸበርኩም ዓሚልና፤ ናይ ስማርት ሜትር ቶከን ቁጽርኹም: ${token} እዩ። ናይ መብራህቲ ኣገልግሎትኩም ንምምላእ ነቲ ቶከን ኣብ ቆጻሪኹም ኣእትውዎ። ንተወሳኺ ሓበሬታ ብ905 ደውሉልና።`;
+      return `ክቡር ደንበኛና፣ ናይ ስማርት ሜተር ቶከን ቁፅርኹም፡ ${token} እዩ። ብበጃኹም ናይ ኤሌክትሪክ ኣገልግሎትኹም ንምምላእ ቶከን ኣብ ሪሞት የእትዉ። ንተወሳኺ ሓበሬታ ብ 905 ደውሉ።`;
     case 'en':
     default:
       return `Dear Customer, your smart meter token number is: ${token}. Please enter the token into your meter to recharge your electricity service. For inquiries, please call our 905 helplines.`;
