@@ -22,7 +22,7 @@ export function getComplaintSMSText(ticketId: string, lang: TicketLanguage): str
     case 'am':
       return `ውድ ደንበኛችን፣ የአገልግሎት ጥያቄዎ የቲኬት መለያ ቁጥር ${ticketId} ተሰጥቶታል። በአጭር ጊዜ ውስጥ ባለሙያ ወደ እርሶ ይላካል። ለተጨማሪ ጥያቄዎች እባክዎን 905 ላይ ይደውሉ።`;
     case 'om':
-      return `Kabajamoo maamila keenya, gaaffii tajaajila keessaniif lakkoofsi adda baastuu tikkeettii ${ticketId} kennameera. Yeroo gabaabaa keessatti ogeessi gara keessanitti ni ergama. Gaaffii dabalataatiif 905 irratti bilbilaa.`;
+      return `Kabajamoo maamila keenya, gaaffii tajaajila keessaniif lakkoofsi adda baastuu tikkeettii ${ticketId} anitti ni ergamatti bilbilaa keessan bana godhatti obsaan egaa. Gaaffii dabalataatiif 905 irratti bilbilaa.`;
     case 'ti':
       return `ክቡር ደንበኛና፣ ናይ ኣገልግሎት ሕቶኹም ናይ ቲኬት ቁፅሪ ${ticketId} ተዋሂብዎ ኣሎ። ኣብ ሓጺር እዋን ሰብ ሞያ ናብ እትረክብሉ ቦታ ክልኣኽ እዩ። ንተወሳኺ ሕቶታት ብበጃኹም ብ 905 ደውሉ።`;
     case 'en':
