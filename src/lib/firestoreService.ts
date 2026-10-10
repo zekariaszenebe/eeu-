@@ -188,8 +188,8 @@ export function subscribeToInterruptions(onUpdate: (items: FeederInterruption[])
     if (onlyActive) {
       q = query(interruptionsCol, where('status', 'in', [InterruptionStatus.ACTIVE, InterruptionStatus.UNDER_INVESTIGATION]));
     } else {
-      // Limit to 150 records to prevent unbounded historical document reads
-      q = query(interruptionsCol, limit(150));
+      // Limit to 50 records max to drastically reduce document reads
+      q = query(interruptionsCol, limit(50));
     }
     return onSnapshot(q, (snapshot) => {
       const list: FeederInterruption[] = [];
