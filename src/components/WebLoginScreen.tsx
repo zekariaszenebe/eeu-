@@ -34,11 +34,10 @@ export default function WebLoginScreen({ onLoginSuccess, teamLeaders = [] }: Web
     }
   }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const processLogin = (targetUser: string, targetPass: string) => {
     setError('');
 
-    if (!username.trim() || !password) {
+    if (!targetUser.trim() || !targetPass) {
       setError('Please enter your Employee ID / Username and Password.');
       return;
     }
@@ -46,7 +45,7 @@ export default function WebLoginScreen({ onLoginSuccess, teamLeaders = [] }: Web
     setIsSubmitting(true);
 
     // Normalize user input to compare flexibly with or without leading '@'
-    const rawUser = username.trim().toLowerCase();
+    const rawUser = targetUser.trim().toLowerCase();
     const strippedUser = rawUser.startsWith('@') ? rawUser.substring(1) : rawUser;
     const withAtUser = rawUser.startsWith('@') ? rawUser : `@${rawUser}`;
 
@@ -55,9 +54,9 @@ export default function WebLoginScreen({ onLoginSuccess, teamLeaders = [] }: Web
       if (typeof window !== 'undefined' && 'PasswordCredential' in window && (window as any).PasswordCredential) {
         try {
           const cred = new (window as any).PasswordCredential({
-            id: username,
-            password: password,
-            name: username
+            id: targetUser,
+            password: targetPass,
+            name: targetUser
           });
           if (navigator.credentials && navigator.credentials.store) {
             navigator.credentials.store(cred).catch(() => {});
@@ -68,8 +67,8 @@ export default function WebLoginScreen({ onLoginSuccess, teamLeaders = [] }: Web
       }
 
       // 1. Check if Admin
-      if ((strippedUser === 'admin' || withAtUser === '@admin') && (password === '@zeki2121' || password === 'zeki2121')) {
-        saveCredentials();
+      if ((strippedUser === 'admin' || withAtUser === '@admin') && (targetPass === '@zeki2121' || targetPass === 'zeki2121')) {
+        saveCredentials(targetUser, targetPass);
         onLoginSuccess('admin');
         return;
       }
@@ -78,11 +77,11 @@ export default function WebLoginScreen({ onLoginSuccess, teamLeaders = [] }: Web
       const matchedTL = teamLeaders.find((tl) => {
         const tlUser = tl.username.trim().toLowerCase();
         const tlStripped = tlUser.startsWith('@') ? tlUser.substring(1) : tlUser;
-        return (tlUser === rawUser || tlUser === withAtUser || tlStripped === strippedUser) && tl.password === password;
+        return (tlUser === rawUser || tlUser === withAtUser || tlStripped === strippedUser) && tl.password === targetPass;
       });
 
       if (matchedTL) {
-        saveCredentials();
+        saveCredentials(targetUser, targetPass);
         onLoginSuccess('team_leader', matchedTL);
         return;
       }
@@ -90,7 +89,7 @@ export default function WebLoginScreen({ onLoginSuccess, teamLeaders = [] }: Web
       // Default hardcoded Team Leader fallback (Teams A, B, C, D and named Team Leaders like Zekarias Zenebe)
       if (
         (strippedUser === 'teamleader' || strippedUser === 'tl' || strippedUser === 'team_a' || strippedUser === 'team_b' || strippedUser === 'team_c' || strippedUser === 'team_d' || strippedUser === 'teama' || strippedUser === 'teamb' || strippedUser === 'teamc' || strippedUser === 'teamd' || strippedUser === 'zekarias' || strippedUser === 'zekariaszenebe' || strippedUser === 'zekarias_zenebe' || strippedUser === 'zenebe') && 
-        (password === 'Tl@1234' || password === 'Eeu@1234')
+        (targetPass === 'Tl@1234' || targetPass === 'Eeu@1234')
       ) {
         let teamName = 'Team A Leader';
         let districtName = 'Team A';
@@ -107,7 +106,7 @@ export default function WebLoginScreen({ onLoginSuccess, teamLeaders = [] }: Web
           districtName = 'Team D';
         }
 
-        saveCredentials();
+        saveCredentials(targetUser, targetPass);
         onLoginSuccess('team_leader', {
           id: `tl-fallback-${strippedUser}`,
           username: rawUser,
@@ -121,8 +120,8 @@ export default function WebLoginScreen({ onLoginSuccess, teamLeaders = [] }: Web
       }
 
       // 3. Check Contact Center Agent
-      if ((strippedUser === 'contactcenter' || strippedUser === 'agent') && password === 'Eeu@1234') {
-        saveCredentials();
+      if ((strippedUser === 'contactcenter' || strippedUser === 'agent') && targetPass === 'Eeu@1234') {
+        saveCredentials(targetUser, targetPass);
         onLoginSuccess('agent');
         return;
       }
@@ -130,14 +129,26 @@ export default function WebLoginScreen({ onLoginSuccess, teamLeaders = [] }: Web
       // Invalid
       setError('Access Denied: Invalid credentials. Please check your username and password.');
       setIsSubmitting(false);
-    }, 500);
+    }, 400);
   };
 
-  const saveCredentials = () => {
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    processLogin(username, password);
+  };
+
+  const handleQuickContactCenterLogin = () => {
+    if (isSubmitting) return;
+    setUsername('contactcenter');
+    setPassword('Eeu@1234');
+    processLogin('contactcenter', 'Eeu@1234');
+  };
+
+  const saveCredentials = (userVal: string = username, passVal: string = password) => {
     if (rememberMe) {
       localStorage.setItem('eeu_remember_me', 'true');
-      localStorage.setItem('eeu_saved_username', username);
-      localStorage.setItem('eeu_saved_password', password);
+      localStorage.setItem('eeu_saved_username', userVal);
+      localStorage.setItem('eeu_saved_password', passVal);
     } else {
       localStorage.removeItem('eeu_remember_me');
       localStorage.removeItem('eeu_saved_username');
@@ -332,22 +343,6 @@ export default function WebLoginScreen({ onLoginSuccess, teamLeaders = [] }: Web
                 </div>
               </div>
 
-              {/* Remember Me Row */}
-              <div className="flex items-center justify-between pt-0.5 select-none text-xs sm:text-sm">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    id="login-remember-me"
-                    type="checkbox"
-                    checked={rememberMe}
-                    onChange={(e) => setRememberMe(e.target.checked)}
-                    disabled={isSubmitting}
-                    className="w-4 h-4 rounded border-gray-300 text-[#0d4a2b] focus:ring-[#0d4a2b] cursor-pointer accent-[#0d4a2b]"
-                  />
-                  <span className="text-gray-600 font-medium">
-                    Remember me
-                  </span>
-                </label>
-              </div>
 
               {/* Error Box */}
               {error && (
@@ -364,18 +359,35 @@ export default function WebLoginScreen({ onLoginSuccess, teamLeaders = [] }: Web
                 disabled={isSubmitting}
                 className="w-full py-3.5 bg-[#0a5c36] hover:bg-[#074729] active:bg-[#053a20] text-white rounded-xl font-bold text-sm sm:text-base transition-all shadow-md shadow-emerald-900/15 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 leading-none mt-2"
               >
-                {isSubmitting ? (
-                  <>
-                    <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                    </svg>
-                    <span>Signing in...</span>
-                  </>
-                ) : (
-                  <span>Login</span>
-                )}
+                <span>Login</span>
               </button>
+
+              {/* Quick Contact Center Auto-Fill & Enter Card */}
+              <div
+                id="contactcenter-quick-login-card"
+                onClick={handleQuickContactCenterLogin}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    handleQuickContactCenterLogin();
+                  }
+                }}
+                className="mt-3 p-2 sm:p-2.5 rounded-2xl bg-gradient-to-br from-emerald-50 via-green-50/70 to-emerald-50 border border-emerald-300/80 hover:border-emerald-500 transition-all duration-200 cursor-pointer shadow-xs hover:shadow-md group select-none text-left"
+                title="Click to automatically fill Contact Center credentials and log in"
+              >
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="bg-white/95 rounded-xl px-2.5 py-1.5 border border-emerald-200/70 shadow-2xs">
+                    <span className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider">Username</span>
+                    <span className="block font-mono font-bold text-[#0d4a2b] text-[13px] tracking-tight">contactcenter</span>
+                  </div>
+                  <div className="bg-white/95 rounded-xl px-2.5 py-1.5 border border-emerald-200/70 shadow-2xs">
+                    <span className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider">Password</span>
+                    <span className="block font-mono font-bold text-[#0d4a2b] text-[13px] tracking-tight">Eeu@1234</span>
+                  </div>
+                </div>
+              </div>
             </form>
 
             {/* Bottom Credits & Copyright */}
