@@ -377,14 +377,24 @@ export default function WebLoginScreen({ onLoginSuccess, teamLeaders = [] }: Web
                 className="mt-3 p-2 sm:p-2.5 rounded-2xl bg-gradient-to-br from-emerald-50 via-green-50/70 to-emerald-50 border border-emerald-300/80 hover:border-emerald-500 transition-all duration-200 cursor-pointer shadow-xs hover:shadow-md group select-none text-left"
                 title="Click to automatically fill Contact Center credentials and log in"
               >
+                <div className="flex items-center justify-between mb-1.5 px-1">
+                  <span className="text-[11px] font-bold text-[#0d4a2b] uppercase tracking-wider flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                    Quick Login
+                  </span>
+                  <span className="text-[10px] font-medium text-emerald-700/80 group-hover:text-emerald-800 transition-colors">
+                    Click to fill & enter
+                  </span>
+                </div>
+
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div className="bg-white/95 rounded-xl px-2.5 py-1.5 border border-emerald-200/70 shadow-2xs">
                     <span className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider">Username</span>
-                    <span className="block font-mono font-bold text-[#0d4a2b] text-[13px] tracking-tight">contactcenter</span>
+                    <span className="block font-bold text-[#0d4a2b] text-[13px] tracking-tight" style={{ fontFamily: 'Inter, sans-serif' }}>contactcenter</span>
                   </div>
                   <div className="bg-white/95 rounded-xl px-2.5 py-1.5 border border-emerald-200/70 shadow-2xs">
                     <span className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider">Password</span>
-                    <span className="block font-mono font-bold text-[#0d4a2b] text-[13px] tracking-tight">Eeu@1234</span>
+                    <span className="block font-bold text-[#0d4a2b] text-[13px] tracking-tight" style={{ fontFamily: 'Inter, sans-serif' }}>Eeu@1234</span>
                   </div>
                 </div>
               </div>
