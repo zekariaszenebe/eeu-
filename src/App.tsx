@@ -563,7 +563,7 @@ export default function App() {
               className="w-full mt-2 py-2 text-center text-xs font-bold text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-800 rounded-xl flex items-center justify-center gap-2 hover:bg-gray-100 dark:hover:bg-gray-900 cursor-pointer"
             >
               <LogOut className="w-3.5 h-3.5 text-red-500 animate-pulse" />
-              <span>SIGN OUT PORTAL</span>
+              <span>LOG OUT</span>
             </button>
 
             <div className="text-[10px] text-gray-400 dark:text-gray-500 text-center select-none pt-2.5 font-sans border-t border-gray-100 dark:border-gray-900/40">

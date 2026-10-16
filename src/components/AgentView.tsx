@@ -750,15 +750,13 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
     const cleanLocQuery = locQuery.replace(/[\s\-_.]/g, '');
     const cleanEnglishName = loc.englishName.toLowerCase().replace(/[\s\-_.]/g, '');
     const cleanAmharicName = loc.name.toLowerCase();
-    const cleanFeederName = loc.feederName.toLowerCase();
     const cleanDistrict = loc.district.toLowerCase();
 
-    // Check direct match, English match, cleaned spaceless match, feeder, and district
+    // Check direct match, English match, cleaned spaceless match, and district
     const matchesSearch = 
       cleanAmharicName.includes(locQuery) || 
       loc.englishName.toLowerCase().includes(locQuery) ||
       cleanEnglishName.includes(cleanLocQuery) ||
-      cleanFeederName.includes(locQuery) ||
       cleanDistrict.includes(locQuery);
 
     const matchesDistrict = selectedDistrict === 'All' || loc.district === selectedDistrict;
@@ -1208,7 +1206,7 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
                               <div className="flex-1 space-y-2">
                                 <div className="p-3.5 rounded-2xl bg-gray-100/40 dark:bg-gray-950/40 border border-gray-200/30 dark:border-gray-850/40 text-xs lg:w-[670px] w-full">
                                   <div className="font-semibold text-gray-400 dark:text-gray-500 uppercase text-[9px] tracking-wider mb-1.5 font-sans flex items-center justify-between">
-                                    <span>Affected Communities & Landmark Areas</span>
+                                    <span>Affected Areas & Landmarks</span>
                                     <span className="font-mono text-[9px] text-eeu-green bg-eeu-green/10 px-1.5 py-0.2 rounded font-bold">
                                       {languageMode === 'en' ? 'EN' : 'አማ'}
                                     </span>
@@ -1325,7 +1323,7 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
                                 {/* Affected Area details */}
                                 <div className="p-3 rounded-xl bg-gray-100/50 dark:bg-gray-950/40 border border-gray-200/50 dark:border-gray-850/60 text-xs">
                                   <div className="font-semibold text-gray-500 dark:text-gray-450 uppercase text-[9px] tracking-wider mb-1.5 font-mono flex items-center justify-between">
-                                    <span>Affected Communities</span>
+                                    <span>Affected Areas</span>
                                     <span className="text-[8.5px] font-mono text-eeu-green font-bold">
                                       {languageMode === 'en' ? 'EN' : 'አማ'}
                                     </span>
