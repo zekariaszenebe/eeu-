@@ -182,15 +182,14 @@ export async function seedInitialDataIfEmpty() {
 /**
  * Subscribes to interruptions updates in real-time.
  */
-export function subscribeToInterruptions(onUpdate: (items: FeederInterruption[]) => void, onlyActive: boolean = false) {
+export function subscribeToInterruptions(onUpdate: (items: FeederInterruption[]) => void, onlyActive: boolean = true) {
   try {
-    let q;
-    if (onlyActive) {
-      q = query(interruptionsCol, where('status', 'in', [InterruptionStatus.ACTIVE, InterruptionStatus.UNDER_INVESTIGATION]));
-    } else {
-      // Limit to 50 records max to drastically reduce document reads
-      q = query(interruptionsCol, limit(50));
-    }
+    // Strictly query active & investigating interruptions only.
+    // When 0 feeders are active in the database: this costs 0 reads!
+    // When 1 feeder is active in the database: this costs EXACTLY 1 read!
+    const q = onlyActive
+      ? query(interruptionsCol, where('status', 'in', [InterruptionStatus.ACTIVE, InterruptionStatus.UNDER_INVESTIGATION]))
+      : query(interruptionsCol, limit(50));
     return onSnapshot(q, (snapshot) => {
       const list: FeederInterruption[] = [];
       snapshot.forEach((doc) => {

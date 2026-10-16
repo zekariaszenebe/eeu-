@@ -10,7 +10,7 @@ import { useInterruptions } from './context/InterruptionContext';
 
 // Types and mock data
 import { FeederInterruption, InterruptionType, InterruptionStatus, TeamLeaderNote, ContactItem, TeamLeaderUser, UserRole, isPlannedOrOperational } from './types';
-import { INITIAL_INTERRUPTIONS, INITIAL_DISTRICTS, INITIAL_FEEDERS_LIST } from './data/mockData';
+import { INITIAL_INTERRUPTIONS, INITIAL_DISTRICTS, INITIAL_FEEDERS_LIST, INITIAL_CUSTOMER_CONTACTS } from './data/mockData';
 import { FEEDERS_VERSION } from './data/feedersList';
 
 // Firestore Services
@@ -39,7 +39,7 @@ import {
   updateTeamLeaderDoc,
   deleteTeamLeaderDoc
 } from './lib/firestoreService';
-import { HubRecord } from './data/hubData';
+import { HubRecord, HUB_RECORDS } from './data/hubData';
 
 // Subcomponents
 import Sidebar from './components/Sidebar';
@@ -101,10 +101,42 @@ export default function App() {
     return INITIAL_FEEDERS_LIST;
   });
 
-  const [hubRecords, setHubRecords] = useState<HubRecord[]>([]);
-  const [teamLeaderNotes, setTeamLeaderNotes] = useState<TeamLeaderNote[]>([]);
-  const [customerContacts, setCustomerContacts] = useState<ContactItem[]>([]);
-  const [teamLeaders, setTeamLeaders] = useState<TeamLeaderUser[]>([]);
+  const [hubRecords, setHubRecords] = useState<HubRecord[]>(() => {
+    const saved = localStorage.getItem('eeu-hub-records');
+    if (saved) {
+      try { return JSON.parse(saved); } catch {}
+    }
+    return HUB_RECORDS;
+  });
+
+  const [teamLeaderNotes, setTeamLeaderNotes] = useState<TeamLeaderNote[]>(() => {
+    const saved = localStorage.getItem('eeu-team-leader-notes');
+    if (saved) {
+      try { return JSON.parse(saved); } catch {}
+    }
+    return [];
+  });
+
+  const [customerContacts, setCustomerContacts] = useState<ContactItem[]>(() => {
+    const saved = localStorage.getItem('eeu-customer-contacts');
+    if (saved) {
+      try { return JSON.parse(saved); } catch {}
+    }
+    return INITIAL_CUSTOMER_CONTACTS;
+  });
+
+  const [teamLeaders, setTeamLeaders] = useState<TeamLeaderUser[]>(() => {
+    const saved = localStorage.getItem('eeu-team-leaders');
+    if (saved) {
+      try { return JSON.parse(saved); } catch {}
+    }
+    return [
+      { id: 'tl-a', username: '@team_a', password: 'Tl@1234', name: 'Team A Leader', role: 'team_leader', district: 'Team A', createdAt: new Date().toISOString() },
+      { id: 'tl-b', username: '@team_b', password: 'Tl@1234', name: 'Team B Leader', role: 'team_leader', district: 'Team B', createdAt: new Date().toISOString() },
+      { id: 'tl-c', username: '@team_c', password: 'Tl@1234', name: 'Team C Leader', role: 'team_leader', district: 'Team C', createdAt: new Date().toISOString() },
+      { id: 'tl-d', username: '@team_d', password: 'Tl@1234', name: 'Zekarias Zenebe', role: 'team_leader', district: 'Team D', createdAt: new Date().toISOString() }
+    ];
+  });
 
   // 3. User Authentication & Tab routing
   const [isWebLoggedIn, setIsWebLoggedIn] = useState<boolean>(() => {
@@ -142,42 +174,10 @@ export default function App() {
     });
   };
 
-  // Seed initial data if needed and subscribe to Firestore updates in real-time
+  // Seed baseline data once into local storage without triggering Firestore reads
   useEffect(() => {
-    let unsubFeeders = () => {};
-    let unsubHubRecords = () => {};
-    let unsubNotes = () => {};
-    let unsubCustomerContacts = () => {};
-    let unsubTeamLeaders = () => {};
-
-    seedInitialDataIfEmpty().then(() => {
-      unsubFeeders = subscribeToFeedersList((items) => {
-        setFeedersList(items);
-        localStorage.setItem('eeu-feeders-version', FEEDERS_VERSION);
-        localStorage.setItem('eeu-feeders-list-v4', JSON.stringify(items));
-      });
-      unsubHubRecords = subscribeToHubRecords((items) => {
-        setHubRecords(items);
-      });
-      unsubNotes = subscribeToTeamLeaderNotes((items) => {
-        setTeamLeaderNotes(items);
-      });
-      unsubCustomerContacts = subscribeToCustomerContacts((items) => {
-        setCustomerContacts(items);
-      });
-      unsubTeamLeaders = subscribeToTeamLeaders((items) => {
-        setTeamLeaders(items);
-      });
-    });
-
-    return () => {
-      unsubFeeders();
-      unsubHubRecords();
-      unsubNotes();
-      unsubCustomerContacts();
-      unsubTeamLeaders();
-    };
-  }, [userRole]);
+    seedInitialDataIfEmpty();
+  }, []);
 
   useEffect(() => {
     document.documentElement.classList.remove('dark');
