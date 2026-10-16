@@ -100,11 +100,11 @@ export const INITIAL_INTERRUPTIONS: FeederInterruption[] = [
     feederName: 'MEKANISA - MEK-02',
     district: 'Team D',
     type: InterruptionType.SHORT_CIRCUIT,
-    status: InterruptionStatus.RESTORED,
-    startTime: getPastHoursString(5),
-    estimatedRestorationTime: getPastHoursString(0.5),
+    status: InterruptionStatus.ACTIVE,
+    startTime: getPastHoursString(1.5),
+    estimatedRestorationTime: getFutureHoursString(2.5),
     affectedArea: 'ለቡ ፤ ቻድ ኢንባሲ ፤ 72 መንደር በሙሉ ፤ ተክለ ሀይማኖት ቤተክርስቲያ ፤ ሁጃድ ቻይና ድርጅት (camp) ፤ ጀሞ 3 ፤ ጀሞ ፌደራል ሆስፒታል ድረስ',
-    remark: 'Replaced bird protection guards and localized insulation sleeves. Grid re-energization logged completely stable.',
+    remark: 'Tree branch contact along Lebu trunk line near Chad Embassy. Maintenance crew on site isolating fault.',
     lastUpdated: getPastHoursString(0.5)
   },
   {

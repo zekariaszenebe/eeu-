@@ -10,10 +10,28 @@ import {
 } from 'lucide-react';
 import { FeederInterruption, InterruptionType, InterruptionStatus, normalizeInterruptionType, stripBrackets, TeamLeaderNote, isPlannedOrOperational } from '../types';
 import { INITIAL_DISTRICTS } from '../data/mockData';
+import { INITIAL_FEEDERS_LIST } from '../data/feedersList';
 import { addTeamLeaderNoteDoc, updateTeamLeaderNoteDoc, deleteTeamLeaderNoteDoc } from '../lib/firestoreService';
 import { LanguageMode, translateAmharicLocation, formatLocationDisplay } from '../utils/locationLanguage';
 import { getCardinalDirection } from '../utils/direction';
 export { getCardinalDirection };
+
+/**
+ * Helper to retrieve preset covered community / landmark areas for any feeder line
+ * from the master 250 feeder lines database (e.g., MEK-02 -> Lebu, Chad Embassy, 72 Menbere...)
+ */
+export function getPresetAreasForFeeder(feederName: string): string {
+  if (!feederName) return '';
+  const cleanTarget = feederName.toLowerCase().replace(/[\s\-_]/g, '');
+  const found = INITIAL_FEEDERS_LIST.find((item) => {
+    const cleanItem = item.toLowerCase().replace(/[\s\-_]/g, '');
+    const prefix = cleanItem.split('(')[0];
+    return prefix.includes(cleanTarget) || cleanTarget.includes(prefix);
+  });
+  if (!found) return '';
+  const match = found.match(/\((.*?)\)/);
+  return match ? match[1] : '';
+}
 
 export function sanitizeHtml(html: string): string {
   if (!html) return '';
@@ -652,12 +670,22 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
       return false;
     }
 
-    const query = searchQuery.toLowerCase();
+    const query = searchQuery.toLowerCase().trim();
+    const cleanQuery = query.replace(/[\s\-_.]/g, '');
     const englishArea = translateAmharicLocation(item.affectedArea).toLowerCase();
-    // 1. Search Query Match (matches Feeder name, Amharic affected area, English translated area, and remarks)
-    const matchesSearch = item.feederName.toLowerCase().includes(query) ||
+    
+    // Also lookup preset covered areas for this feeder from master feeder catalog
+    const presetAreas = getPresetAreasForFeeder(item.feederName);
+    const englishPresetAreas = translateAmharicLocation(presetAreas).toLowerCase();
+
+    // 1. Search Query Match (matches Feeder name, Amharic affected area, English translated area, preset catalog areas like Lebu for MEK-02, and remarks)
+    const matchesSearch = !query ||
+                          item.feederName.toLowerCase().includes(query) ||
+                          item.feederName.toLowerCase().replace(/[\s\-_.]/g, '').includes(cleanQuery) ||
                           item.affectedArea.toLowerCase().includes(query) ||
                           englishArea.includes(query) ||
+                          presetAreas.toLowerCase().includes(query) ||
+                          englishPresetAreas.includes(query) ||
                           item.remark.toLowerCase().includes(query);
 
     // 2. District Filter Match
@@ -688,8 +716,7 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
     }
   });
 
-  // Extract unique granular locations only from current active/investigating feeders
-  // Restored locations are cleared from this active directory map
+  // Extract unique locations from interruptions for catalog directory
   const uniqueLocations: Array<{
     name: string;
     englishName: string;
@@ -699,46 +726,48 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
     status: InterruptionStatus;
   }> = [];
 
-  displayInterruptions
-    .filter((item) => item.status !== InterruptionStatus.RESTORED)
-    .forEach((item) => {
-      // Split the affectedArea on typical Amharic and English delimiter characters
-      const rawParts = item.affectedArea.split(/[፣、፤,;]+/);
+  displayInterruptions.forEach((item) => {
+    // Combine explicit affectedArea with the feeder's master preset areas (e.g. MEK-02 covers Lebu, Chad Embassy, 72 Menbere...)
+    const presetAreas = getPresetAreasForFeeder(item.feederName);
+    const combinedAreaStr = [item.affectedArea, presetAreas].filter(Boolean).join(' ፤ ');
+
+    // Split on typical Amharic and English delimiter characters
+    const rawParts = combinedAreaStr.split(/[፣、፤,;]+/);
+    
+    rawParts.forEach((part) => {
+      let trimmed = part.trim();
       
-      rawParts.forEach((part) => {
-        let trimmed = part.trim();
-        
-        // Clear final punctuation or helper phrases
-        if (trimmed.endsWith('።')) {
-          trimmed = trimmed.replace(/።+$/, '');
+      // Clean leading and trailing helper qualifiers (በከፊል, በሙሉ, ድረስ, እና አካባቢው, አካባቢ)
+      trimmed = trimmed.replace(/^(በከፊል|በክፊል|እና)\s+/g, '');
+      trimmed = trimmed.replace(/\s+(በከፊል|በክፊል|በሙሉ|ድረስ|እና\s*አካባቢው|አካባቢ|ያልቃል)$/g, '');
+      trimmed = trimmed.replace(/[።.()]+$/g, '').trim();
+      
+      // Keep valid location tags: Amharic 2-letter words like "ለቡ" (Lebu), "ቦሌ" (Bole) have length 2
+      if (
+        trimmed.length >= 2 && 
+        !trimmed.startsWith('በክፊል') && 
+        !trimmed.startsWith('በከፊል') &&
+        !trimmed.endsWith('ያልቃል') &&
+        !trimmed.startsWith('እና አካባቢው')
+      ) {
+        const englishTrans = translateAmharicLocation(trimmed);
+        // Prevent duplicate location tags for the same feeder
+        const exists = uniqueLocations.some(
+          (loc) => (loc.name.toLowerCase() === trimmed.toLowerCase() || loc.englishName.toLowerCase() === englishTrans.toLowerCase()) && loc.feederId === item.id
+        );
+        if (!exists) {
+          uniqueLocations.push({
+            name: trimmed,
+            englishName: englishTrans,
+            district: item.district,
+            feederName: item.feederName,
+            feederId: item.id,
+            status: item.status
+          });
         }
-        
-        // Filter out short texts, pure English or Amharic helper terms that aren't locations
-        if (
-          trimmed.length > 2 && 
-          !trimmed.startsWith('በክፊል') && 
-          !trimmed.startsWith('በከፊል') &&
-          !trimmed.endsWith('ያልቃል') &&
-          !trimmed.startsWith('እና አካባቢው')
-        ) {
-          const englishTrans = translateAmharicLocation(trimmed);
-          // Prevent duplicate location tags for the same feeder
-          const exists = uniqueLocations.some(
-            (loc) => (loc.name.toLowerCase() === trimmed.toLowerCase() || loc.englishName.toLowerCase() === englishTrans.toLowerCase()) && loc.feederId === item.id
-          );
-          if (!exists) {
-            uniqueLocations.push({
-              name: trimmed,
-              englishName: englishTrans,
-              district: item.district,
-              feederName: item.feederName,
-              feederId: item.id,
-              status: item.status
-            });
-          }
-        }
-      });
+      }
     });
+  });
 
   // Filter unique locations by directory search query and selected district
   const filteredUniqueLocations = uniqueLocations.filter((loc) => {
@@ -750,19 +779,23 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
     const cleanLocQuery = locQuery.replace(/[\s\-_.]/g, '');
     const cleanEnglishName = loc.englishName.toLowerCase().replace(/[\s\-_.]/g, '');
     const cleanAmharicName = loc.name.toLowerCase();
+    const cleanFeederName = loc.feederName.toLowerCase().replace(/[\s\-_.]/g, '');
     const cleanDistrict = loc.district.toLowerCase();
 
-    // Check direct match, English match, cleaned spaceless match, and district
+    // Check direct match, English match, cleaned spaceless match, feeder name, and district
     const matchesSearch = 
       cleanAmharicName.includes(locQuery) || 
       loc.englishName.toLowerCase().includes(locQuery) ||
       cleanEnglishName.includes(cleanLocQuery) ||
+      cleanFeederName.includes(cleanLocQuery) ||
+      loc.feederName.toLowerCase().includes(locQuery) ||
       cleanDistrict.includes(locQuery);
 
     const matchesDistrict = selectedDistrict === 'All' || loc.district === selectedDistrict;
     
     return matchesSearch && matchesDistrict;
   });
+
 
   // Compute direction statistics based on all current active interruptions
   const directionStats: Record<string, { active: number, restored: number, total: number, areas: string[] }> = {
