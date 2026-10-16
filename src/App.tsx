@@ -388,6 +388,38 @@ export default function App() {
     setCurrentTab('dashboard');
   };
 
+  // 3-Hour Inactivity Auto-Logout Timer (10,800,000 ms)
+  useEffect(() => {
+    if (!isWebLoggedIn) return;
+
+    let timeoutId: NodeJS.Timeout;
+
+    const resetTimer = () => {
+      clearTimeout(timeoutId);
+      // 3 hours = 3 * 60 * 60 * 1000 ms = 10800000 ms
+      timeoutId = setTimeout(() => {
+        handleLogoutWeb();
+      }, 3 * 60 * 60 * 1000);
+    };
+
+    // Events to track user activity
+    const activityEvents = ['mousedown', 'keydown', 'scroll', 'touchstart', 'mousemove'];
+
+    activityEvents.forEach(event => {
+      window.addEventListener(event, resetTimer);
+    });
+
+    // Initialize timer on login
+    resetTimer();
+
+    return () => {
+      clearTimeout(timeoutId);
+      activityEvents.forEach(event => {
+        window.removeEventListener(event, resetTimer);
+      });
+    };
+  }, [isWebLoggedIn]);
+
   // Logout admin mode
   const handleLogoutAdmin = () => {
     setIsAdmin(false);
