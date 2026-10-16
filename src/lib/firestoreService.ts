@@ -180,57 +180,44 @@ export async function seedInitialDataIfEmpty() {
 }
 
 /**
- * Subscribes to interruptions updates in real-time.
+ * Subscribes to interruptions updates using the high-efficiency Single State Document pattern.
+ * This reads exactly 1 document in Firestore regardless of how many outages exist (0, 5, 20, or 50).
+ * 140 agent visits = ~140 reads total per day!
  */
 export function subscribeToInterruptions(onUpdate: (items: FeederInterruption[]) => void, onlyActive: boolean = true) {
   try {
-    // Strictly query active & investigating interruptions only.
-    // When 0 feeders are active in the database: this costs 0 reads!
-    // When 1 feeder is active in the database: this costs EXACTLY 1 read!
-    const q = onlyActive
-      ? query(interruptionsCol, where('status', 'in', [InterruptionStatus.ACTIVE, InterruptionStatus.UNDER_INVESTIGATION]))
-      : query(interruptionsCol, limit(50));
-    return onSnapshot(q, (snapshot) => {
-      const list: FeederInterruption[] = [];
-      snapshot.forEach((doc) => {
-        const data = doc.data();
-        const feeder = data.feederName || '';
-        const dist = data.district || 'Team A';
-        list.push({
-          id: data.id || doc.id,
-          feederName: feeder,
-          district: dist,
-          direction: data.direction || getCardinalDirection(dist, feeder),
-          type: normalizeInterruptionType(data.type),
-          status: data.status || InterruptionStatus.ACTIVE,
-          startTime: data.startTime || '',
-          estimatedRestorationTime: data.estimatedRestorationTime || 'N/A',
-          affectedArea: data.affectedArea || '',
-          remark: data.remark || '',
-          lastUpdated: data.lastUpdated || ''
-        } as FeederInterruption);
-      });
-      
-      const sorted = [...list].sort((a, b) => {
-        const aRestored = a.status === InterruptionStatus.RESTORED;
-        const bRestored = b.status === InterruptionStatus.RESTORED;
-        if (!aRestored && bRestored) return -1;
-        if (aRestored && !bRestored) return 1;
-        return (b.lastUpdated || '').localeCompare(a.lastUpdated || '');
-      });
-      
-      try {
-        localStorage.setItem('eeu-interruptions', JSON.stringify(sorted));
-      } catch {}
+    const liveDocRef = doc(db, 'systemSettings', 'liveInterruptions');
+    return onSnapshot(liveDocRef, (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        if (Array.isArray(data.outages)) {
+          const list = data.outages as FeederInterruption[];
+          const sorted = [...list].sort((a, b) => {
+            const aRestored = a.status === InterruptionStatus.RESTORED;
+            const bRestored = b.status === InterruptionStatus.RESTORED;
+            if (!aRestored && bRestored) return -1;
+            if (aRestored && !bRestored) return 1;
+            return (b.lastUpdated || '').localeCompare(a.lastUpdated || '');
+          });
+          try {
+            localStorage.setItem('eeu-interruptions', JSON.stringify(sorted));
+          } catch {}
+          onUpdate(sorted);
+          return;
+        }
+      }
 
-      onUpdate(sorted);
+      // If liveInterruptions doc doesn't exist yet, seed it once with local cache / mock data
+      const cached = getLocal<FeederInterruption[]>('eeu-interruptions', INITIAL_INTERRUPTIONS);
+      onUpdate(cached);
+      setDoc(liveDocRef, { outages: cached, lastUpdated: new Date().toISOString() }).catch(() => {});
     }, (err) => {
-      handleFirestoreError(err, OperationType.GET, 'interruptions');
-      const cached = getLocal<FeederInterruption[]>('eeu-interruptions', []);
+      handleFirestoreError(err, OperationType.GET, 'systemSettings/liveInterruptions');
+      const cached = getLocal<FeederInterruption[]>('eeu-interruptions', INITIAL_INTERRUPTIONS);
       onUpdate(cached);
     });
   } catch {
-    const cached = getLocal<FeederInterruption[]>('eeu-interruptions', []);
+    const cached = getLocal<FeederInterruption[]>('eeu-interruptions', INITIAL_INTERRUPTIONS);
     onUpdate(cached);
     return () => {};
   }
@@ -333,13 +320,16 @@ export async function addInterruptionDoc(entry: Omit<FeederInterruption, 'id' | 
 
   // Local storage update
   const localList = getLocal<FeederInterruption[]>('eeu-interruptions', []);
-  setLocal('eeu-interruptions', [record, ...localList.filter(i => i.id !== newId)]);
+  const updatedList = [record, ...localList.filter(i => i.id !== newId)];
+  setLocal('eeu-interruptions', updatedList);
 
   if (!isFirestoreQuotaExhausted()) {
     try {
+      const liveDocRef = doc(db, 'systemSettings', 'liveInterruptions');
+      await setDoc(liveDocRef, { outages: updatedList, lastUpdated: timestampStr });
       await setDoc(doc(db, 'interruptions', newId), record);
     } catch (error) {
-      handleFirestoreError(error, OperationType.CREATE, `interruptions/${newId}`);
+      handleFirestoreError(error, OperationType.CREATE, `systemSettings/liveInterruptions`);
     }
   }
 
@@ -390,13 +380,16 @@ export async function updateInterruptionDoc(id: string, entry: Partial<FeederInt
 
   // Local storage update
   const localList = getLocal<FeederInterruption[]>('eeu-interruptions', []);
-  setLocal('eeu-interruptions', localList.map(i => i.id === id ? merged : i));
+  const updatedList = localList.map(i => i.id === id ? merged : i);
+  setLocal('eeu-interruptions', updatedList);
   
   if (!isFirestoreQuotaExhausted()) {
     try {
+      const liveDocRef = doc(db, 'systemSettings', 'liveInterruptions');
+      await setDoc(liveDocRef, { outages: updatedList, lastUpdated: timestampStr });
       await setDoc(doc(db, 'interruptions', id), merged);
     } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, `interruptions/${id}`);
+      handleFirestoreError(error, OperationType.UPDATE, `systemSettings/liveInterruptions`);
     }
   }
 }
@@ -406,13 +399,16 @@ export async function updateInterruptionDoc(id: string, entry: Partial<FeederInt
  */
 export async function deleteInterruptionDoc(id: string) {
   const localList = getLocal<FeederInterruption[]>('eeu-interruptions', []);
-  setLocal('eeu-interruptions', localList.filter(i => i.id !== id));
+  const updatedList = localList.filter(i => i.id !== id);
+  setLocal('eeu-interruptions', updatedList);
 
   if (!isFirestoreQuotaExhausted()) {
     try {
+      const liveDocRef = doc(db, 'systemSettings', 'liveInterruptions');
+      await setDoc(liveDocRef, { outages: updatedList, lastUpdated: new Date().toISOString() });
       await deleteDoc(doc(db, 'interruptions', id));
     } catch (error) {
-      handleFirestoreError(error, OperationType.DELETE, `interruptions/${id}`);
+      handleFirestoreError(error, OperationType.DELETE, `systemSettings/liveInterruptions`);
     }
   }
 }

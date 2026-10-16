@@ -117,12 +117,16 @@ export const InterruptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     };
   }, []);
 
-  // Subscribe to real-time updates from firestore database
+  // Subscribe to real-time updates from firestore database with Tab Visibility Awareness
+  // Pauses listener when agent minimizes or switches away from tab (0 background reads)
   useEffect(() => {
     let unsub = () => {};
-    seedInitialDataIfEmpty().then(() => {
+    let isSubscribed = false;
+
+    const startSubscription = () => {
+      if (isSubscribed) return;
+      isSubscribed = true;
       unsub = subscribeToInterruptions((items) => {
-        // Only trigger update if length or items are modified
         setInterruptions(prev => {
           const serializedPrev = JSON.stringify(prev);
           const serializedNext = JSON.stringify(items);
@@ -137,8 +141,39 @@ export const InterruptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
           return items;
         });
       });
-    });
-    return () => unsub();
+    };
+
+    const stopSubscription = () => {
+      if (!isSubscribed) return;
+      isSubscribed = false;
+      unsub();
+      unsub = () => {};
+    };
+
+    // Initial startup
+    startSubscription();
+
+    // Sleep listener when browser tab is hidden or minimized
+    const handleVisibilityChange = () => {
+      if (typeof document !== 'undefined') {
+        if (document.hidden) {
+          stopSubscription();
+        } else {
+          startSubscription();
+        }
+      }
+    };
+
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+    }
+
+    return () => {
+      stopSubscription();
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+      }
+    };
   }, []);
 
   // Keep active local state clean and bounded
