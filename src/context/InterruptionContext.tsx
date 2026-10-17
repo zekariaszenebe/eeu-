@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { FeederInterruption, InterruptionStatus, normalizeInterruptionType } from '../types';
-import { INITIAL_INTERRUPTIONS } from '../data/mockData';
 import { getCardinalDirection } from '../utils/direction';
 import { 
   addInterruptionDoc, 
@@ -43,36 +42,37 @@ export const InterruptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     let loaded: FeederInterruption[] = [];
     if (saved) {
       try {
-        loaded = JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          loaded = parsed;
+        }
       } catch (e) {
         console.error('Failed to parse interruptions from localStorage', e);
       }
     }
     
-    // Deep deduplication safeguard
+    // Purge legacy mock outage IDs (f-1 through f-13) and deduplicate
+    const legacyMockIds = new Set(['f-1','f-2','f-3','f-4','f-5','f-6','f-7','f-8','f-9','f-10','f-11','f-12','f-13']);
     const seen = new Set<string>();
-    const initialList = (loaded && loaded.length > 0) ? loaded : INITIAL_INTERRUPTIONS;
-    return initialList.filter((item) => {
-      if (!item || !item.id || seen.has(item.id)) {
-        return false;
-      }
+    const cleanList = loaded.filter((item) => {
+      if (!item || !item.id || seen.has(item.id)) return false;
+      // Exclude legacy mock items so they never glitch or display on refresh
+      if (legacyMockIds.has(item.id) || /^f-\d{1,2}$/.test(item.id)) return false;
       seen.add(item.id);
       return true;
-    }).map(item => {
-      // Ensure MEK-02 (f-6) is active so Lebu is live and searchable
-      if (item.id === 'f-6' && item.status === InterruptionStatus.RESTORED) {
-        return {
-          ...item,
-          status: InterruptionStatus.ACTIVE,
-          estimatedRestorationTime: item.estimatedRestorationTime || 'In 2.5 hours',
-          type: normalizeInterruptionType(item.type)
-        };
-      }
-      return {
-        ...item,
-        type: normalizeInterruptionType(item.type)
-      };
-    });
+    }).map(item => ({
+      ...item,
+      type: normalizeInterruptionType(item.type)
+    }));
+
+    // If cleaned list differs from saved, sync cleaned list back to localStorage
+    if (saved && cleanList.length !== loaded.length) {
+      try {
+        localStorage.setItem('eeu-interruptions', JSON.stringify(cleanList));
+      } catch {}
+    }
+
+    return cleanList;
   });
 
   const [liveToast, setLiveToast] = useState<{ title: string; desc: string; type: 'info' | 'success' | 'warn' } | null>(null);

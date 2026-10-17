@@ -8,9 +8,8 @@ import {
 // Context
 import { useInterruptions } from './context/InterruptionContext';
 
-// Types and mock data
 import { FeederInterruption, InterruptionType, InterruptionStatus, TeamLeaderNote, ContactItem, TeamLeaderUser, UserRole, isPlannedOrOperational } from './types';
-import { INITIAL_INTERRUPTIONS, INITIAL_DISTRICTS, INITIAL_FEEDERS_LIST, INITIAL_CUSTOMER_CONTACTS } from './data/mockData';
+import { INITIAL_DISTRICTS, INITIAL_FEEDERS_LIST, INITIAL_CUSTOMER_CONTACTS } from './data/mockData';
 import { FEEDERS_VERSION } from './data/feedersList';
 
 // Firestore Services

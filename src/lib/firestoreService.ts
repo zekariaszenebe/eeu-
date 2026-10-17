@@ -17,7 +17,7 @@ import {
 import { db } from './firebase';
 import { FeederInterruption, InterruptionStatus, InterruptionType, normalizeInterruptionType, TeamLeaderNote, ContactItem, TeamLeaderUser } from '../types';
 import { getCardinalDirection } from '../utils/direction';
-import { INITIAL_INTERRUPTIONS, INITIAL_FEEDERS_LIST, INITIAL_CUSTOMER_CONTACTS } from '../data/mockData';
+import { INITIAL_FEEDERS_LIST, INITIAL_CUSTOMER_CONTACTS } from '../data/mockData';
 import { FEEDERS_VERSION } from '../data/feedersList';
 import { HubRecord, HUB_RECORDS } from '../data/hubData';
 
@@ -207,17 +207,17 @@ export function subscribeToInterruptions(onUpdate: (items: FeederInterruption[])
         }
       }
 
-      // If liveInterruptions doc doesn't exist yet, seed it once with local cache / mock data
-      const cached = getLocal<FeederInterruption[]>('eeu-interruptions', INITIAL_INTERRUPTIONS);
+      // If liveInterruptions doc doesn't exist yet, seed it once with local cache / empty data
+      const cached = getLocal<FeederInterruption[]>('eeu-interruptions', []).filter(item => item && !/^f-\d{1,2}$/.test(item.id));
       onUpdate(cached);
       setDoc(liveDocRef, { outages: cached, lastUpdated: new Date().toISOString() }).catch(() => {});
     }, (err) => {
       handleFirestoreError(err, OperationType.GET, 'systemSettings/liveInterruptions');
-      const cached = getLocal<FeederInterruption[]>('eeu-interruptions', INITIAL_INTERRUPTIONS);
+      const cached = getLocal<FeederInterruption[]>('eeu-interruptions', []).filter(item => item && !/^f-\d{1,2}$/.test(item.id));
       onUpdate(cached);
     });
   } catch {
-    const cached = getLocal<FeederInterruption[]>('eeu-interruptions', INITIAL_INTERRUPTIONS);
+    const cached = getLocal<FeederInterruption[]>('eeu-interruptions', []).filter(item => item && !/^f-\d{1,2}$/.test(item.id));
     onUpdate(cached);
     return () => {};
   }
@@ -248,7 +248,7 @@ export async function fetchLatestInterruptions(): Promise<FeederInterruption[]> 
   } catch (err) {
     handleFirestoreError(err, OperationType.GET, 'systemSettings/liveInterruptions');
   }
-  return getLocal<FeederInterruption[]>('eeu-interruptions', INITIAL_INTERRUPTIONS);
+  return getLocal<FeederInterruption[]>('eeu-interruptions', []).filter(item => item && !/^f-\d{1,2}$/.test(item.id));
 }
 
 /**
