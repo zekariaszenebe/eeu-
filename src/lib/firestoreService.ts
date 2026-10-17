@@ -224,6 +224,34 @@ export function subscribeToInterruptions(onUpdate: (items: FeederInterruption[])
 }
 
 /**
+ * Direct fetch for the latest interruptions from Firestore.
+ * Used for instant synchronization on tab focus and heartbeat polling.
+ */
+export async function fetchLatestInterruptions(): Promise<FeederInterruption[]> {
+  try {
+    const liveDocRef = doc(db, 'systemSettings', 'liveInterruptions');
+    const snap = await getDoc(liveDocRef);
+    if (snap.exists()) {
+      const data = snap.data();
+      if (Array.isArray(data.outages)) {
+        const sorted = [...(data.outages as FeederInterruption[])].sort((a, b) => {
+          const aRestored = a.status === InterruptionStatus.RESTORED;
+          const bRestored = b.status === InterruptionStatus.RESTORED;
+          if (!aRestored && bRestored) return -1;
+          if (aRestored && !bRestored) return 1;
+          return (b.lastUpdated || '').localeCompare(a.lastUpdated || '');
+        });
+        setLocal('eeu-interruptions', sorted);
+        return sorted;
+      }
+    }
+  } catch (err) {
+    handleFirestoreError(err, OperationType.GET, 'systemSettings/liveInterruptions');
+  }
+  return getLocal<FeederInterruption[]>('eeu-interruptions', INITIAL_INTERRUPTIONS);
+}
+
+/**
  * Subscribes to preset feeders using a single consolidated configuration document
  * in 'systemSettings/presetFeeders'. This reduces document reads from ~248 reads to 1 read.
  */

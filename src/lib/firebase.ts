@@ -1,9 +1,7 @@
-import { initializeApp } from 'firebase/app';
+import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { 
-  initializeFirestore, 
-  persistentLocalCache, 
-  persistentMultipleTabManager, 
+  getFirestore, 
   enableNetwork, 
   setLogLevel 
 } from 'firebase/firestore';
@@ -16,21 +14,13 @@ try {
   // ignore
 }
 
-const app = initializeApp(firebaseConfig);
+const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 
-// Initialize Firestore with custom database ID from config and multi-tab offline cache
-export const db = initializeFirestore(
-  app,
-  {
-    localCache: persistentLocalCache({
-      tabManager: persistentMultipleTabManager()
-    })
-  },
-  firebaseConfig.firestoreDatabaseId
-);
+// Initialize Firestore with custom database ID from config
+export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 export const auth = getAuth(app);
 
-// Always ensure the network is active on startup and clear any stale quota exhaustion flags
+// Always ensure network is active
 if (typeof window !== 'undefined') {
   try {
     localStorage.removeItem('eeu_firestore_quota_exhausted');

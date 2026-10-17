@@ -212,6 +212,23 @@ export default function App() {
     localStorage.removeItem('eeu-theme');
   }, []);
 
+  // Real-time synchronization across all terminals
+  useEffect(() => {
+    const unsubFeeders = subscribeToFeedersList(setFeedersList);
+    const unsubHub = subscribeToHubRecords(setHubRecords);
+    const unsubNotes = subscribeToTeamLeaderNotes(setTeamLeaderNotes);
+    const unsubContacts = subscribeToCustomerContacts(setCustomerContacts);
+    const unsubLeaders = subscribeToTeamLeaders(setTeamLeaders);
+
+    return () => {
+      unsubFeeders();
+      unsubHub();
+      unsubNotes();
+      unsubContacts();
+      unsubLeaders();
+    };
+  }, []);
+
   // Administrative functions
   const handleLoginAdmin = (pin: string): boolean => {
     if (pin === '@zeki2121' || pin === 'zeki2121') {

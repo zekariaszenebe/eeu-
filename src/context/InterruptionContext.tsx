@@ -7,6 +7,7 @@ import {
   updateInterruptionDoc, 
   deleteInterruptionDoc, 
   subscribeToInterruptions,
+  fetchLatestInterruptions,
   seedInitialDataIfEmpty
 } from '../lib/firestoreService';
 
@@ -130,62 +131,61 @@ export const InterruptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     };
   }, []);
 
-  // Subscribe to real-time updates from firestore database with Tab Visibility Awareness
-  // Pauses listener when agent minimizes or switches away from tab (0 background reads)
+  // Continuous real-time subscription to Firestore live interruptions + Instant focus & interval sync
   useEffect(() => {
-    let unsub = () => {};
-    let isSubscribed = false;
+    // 1. Primary real-time onSnapshot listener
+    const unsub = subscribeToInterruptions((items) => {
+      setInterruptions(prev => {
+        const serializedPrev = JSON.stringify(prev);
+        const serializedNext = JSON.stringify(items);
+        if (serializedPrev === serializedNext) return prev;
+        
+        try {
+          localStorage.setItem('eeu-interruptions', serializedNext);
+        } catch (e) {
+          console.error('Failed to write Firestore updates to localStorage', e);
+        }
+        channel?.postMessage({ type: 'SYNC_INTERRUPTIONS', data: items });
+        return items;
+      });
+    });
 
-    const startSubscription = () => {
-      if (isSubscribed) return;
-      isSubscribed = true;
-      unsub = subscribeToInterruptions((items) => {
+    // 2. Immediate synchronization when window/tab is focused or becomes visible
+    const handleSync = async () => {
+      try {
+        const latest = await fetchLatestInterruptions();
         setInterruptions(prev => {
           const serializedPrev = JSON.stringify(prev);
-          const serializedNext = JSON.stringify(items);
+          const serializedNext = JSON.stringify(latest);
           if (serializedPrev === serializedNext) return prev;
-          
           try {
             localStorage.setItem('eeu-interruptions', serializedNext);
-          } catch (e) {
-            console.error('Failed to write Firestore updates to localStorage', e);
-          }
-          channel?.postMessage({ type: 'SYNC_INTERRUPTIONS', data: items });
-          return items;
+          } catch {}
+          channel?.postMessage({ type: 'SYNC_INTERRUPTIONS', data: latest });
+          return latest;
         });
-      });
-    };
-
-    const stopSubscription = () => {
-      if (!isSubscribed) return;
-      isSubscribed = false;
-      unsub();
-      unsub = () => {};
-    };
-
-    // Initial startup
-    startSubscription();
-
-    // Sleep listener when browser tab is hidden or minimized
-    const handleVisibilityChange = () => {
-      if (typeof document !== 'undefined') {
-        if (document.hidden) {
-          stopSubscription();
-        } else {
-          startSubscription();
-        }
+      } catch (err) {
+        console.error('Focus sync error:', err);
       }
     };
 
-    if (typeof document !== 'undefined') {
-      document.addEventListener('visibilitychange', handleVisibilityChange);
-    }
+    const handleVisibility = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        handleSync();
+      }
+    };
+
+    window.addEventListener('focus', handleSync);
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    // 3. Fallback heartbeat interval (every 8 seconds) to guarantee real-time updates without refreshing
+    const heartbeatTimer = setInterval(handleSync, 8000);
 
     return () => {
-      stopSubscription();
-      if (typeof document !== 'undefined') {
-        document.removeEventListener('visibilitychange', handleVisibilityChange);
-      }
+      unsub();
+      window.removeEventListener('focus', handleSync);
+      document.removeEventListener('visibilitychange', handleVisibility);
+      clearInterval(heartbeatTimer);
     };
   }, []);
 
