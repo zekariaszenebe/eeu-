@@ -670,23 +670,23 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
       return false;
     }
 
-    const query = searchQuery.toLowerCase().trim();
-    const cleanQuery = query.replace(/[\s\-_.]/g, '');
+    const effectiveQuery = (searchQuery.trim() || locationSearchQuery.trim()).toLowerCase();
+    const cleanQuery = effectiveQuery.replace(/[\s\-_.]/g, '');
     const englishArea = translateAmharicLocation(item.affectedArea).toLowerCase();
     
     // Also lookup preset covered areas for this feeder from master feeder catalog
     const presetAreas = getPresetAreasForFeeder(item.feederName);
     const englishPresetAreas = translateAmharicLocation(presetAreas).toLowerCase();
 
-    // 1. Search Query Match (matches Feeder name, Amharic affected area, English translated area, preset catalog areas like Lebu for MEK-02, and remarks)
-    const matchesSearch = !query ||
-                          item.feederName.toLowerCase().includes(query) ||
-                          item.feederName.toLowerCase().replace(/[\s\-_.]/g, '').includes(cleanQuery) ||
-                          item.affectedArea.toLowerCase().includes(query) ||
-                          englishArea.includes(query) ||
-                          presetAreas.toLowerCase().includes(query) ||
-                          englishPresetAreas.includes(query) ||
-                          item.remark.toLowerCase().includes(query);
+    // 1. Search Query Match (matches Amharic affected area, English translated area, preset catalog areas like Lebu for MEK-02, feeder name, and remarks)
+    const matchesSearch = !effectiveQuery ||
+                          item.affectedArea.toLowerCase().includes(effectiveQuery) ||
+                          englishArea.includes(effectiveQuery) ||
+                          presetAreas.toLowerCase().includes(effectiveQuery) ||
+                          englishPresetAreas.includes(effectiveQuery) ||
+                          item.remark.toLowerCase().includes(effectiveQuery) ||
+                          item.feederName.toLowerCase().includes(effectiveQuery) ||
+                          item.feederName.toLowerCase().replace(/[\s\-_.]/g, '').includes(cleanQuery);
 
     // 2. District Filter Match
     const matchesDistrict = selectedDistrict === 'All' || item.district === selectedDistrict;
@@ -824,7 +824,7 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
         }
         
         if (
-          trimmed.length > 2 && 
+          trimmed.length >= 2 && 
           !trimmed.startsWith('በክፊል') && 
           !trimmed.startsWith('በከፊል') && 
           !trimmed.endsWith('ያልቃል') && 
@@ -998,6 +998,9 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
                 value={locationSearchQuery}
                 onChange={(e) => {
                   setLocationSearchQuery(e.target.value);
+                  if (searchQuery) {
+                    setSearchQuery('');
+                  }
                   if (e.target.value && !isDirectoryExpanded) {
                     setIsDirectoryExpanded(true);
                   }
@@ -1006,7 +1009,10 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
               />
               {locationSearchQuery && (
                 <button 
-                  onClick={() => setLocationSearchQuery('')}
+                  onClick={() => {
+                    setLocationSearchQuery('');
+                    setSearchQuery('');
+                  }}
                   className="absolute right-2 top-1.5 text-[11px] text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 font-bold px-1"
                   title="Clear search"
                 >

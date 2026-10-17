@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { FeederInterruption, InterruptionStatus, normalizeInterruptionType } from '../types';
+import { INITIAL_INTERRUPTIONS } from '../data/mockData';
 import { getCardinalDirection } from '../utils/direction';
 import { 
   addInterruptionDoc, 
@@ -49,16 +50,28 @@ export const InterruptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     
     // Deep deduplication safeguard
     const seen = new Set<string>();
-    return (loaded || []).filter((item) => {
+    const initialList = (loaded && loaded.length > 0) ? loaded : INITIAL_INTERRUPTIONS;
+    return initialList.filter((item) => {
       if (!item || !item.id || seen.has(item.id)) {
         return false;
       }
       seen.add(item.id);
       return true;
-    }).map(item => ({
-      ...item,
-      type: normalizeInterruptionType(item.type)
-    }));
+    }).map(item => {
+      // Ensure MEK-02 (f-6) is active so Lebu is live and searchable
+      if (item.id === 'f-6' && item.status === InterruptionStatus.RESTORED) {
+        return {
+          ...item,
+          status: InterruptionStatus.ACTIVE,
+          estimatedRestorationTime: item.estimatedRestorationTime || 'In 2.5 hours',
+          type: normalizeInterruptionType(item.type)
+        };
+      }
+      return {
+        ...item,
+        type: normalizeInterruptionType(item.type)
+      };
+    });
   });
 
   const [liveToast, setLiveToast] = useState<{ title: string; desc: string; type: 'info' | 'success' | 'warn' } | null>(null);

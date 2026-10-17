@@ -138,9 +138,37 @@ export default function App() {
     ];
   });
 
-  // 3. User Authentication & Tab routing
+  // 3. User Authentication & Tab routing (Strict 3-hour wall-clock inactivity auto-logout)
   const [isWebLoggedIn, setIsWebLoggedIn] = useState<boolean>(() => {
-    return localStorage.getItem('eeu-web-logged') === 'true';
+    if (typeof window === 'undefined') return false;
+    const isLogged = localStorage.getItem('eeu-web-logged') === 'true';
+    if (!isLogged) return false;
+
+    const lastActiveStr = localStorage.getItem('eeu-last-active');
+    if (!lastActiveStr) {
+      // Stale or missing timestamp -> force re-authentication
+      localStorage.setItem('eeu-web-logged', 'false');
+      localStorage.setItem('eeu-admin-logged', 'false');
+      localStorage.setItem('eeu-user-role', 'agent');
+      localStorage.removeItem('eeu-team-leader-user');
+      localStorage.removeItem('eeu-last-active');
+      return false;
+    }
+
+    const lastActive = parseInt(lastActiveStr, 10);
+    // 3 hours = 3 * 60 * 60 * 1000 ms = 10,800,000 ms
+    if (isNaN(lastActive) || Date.now() - lastActive >= 3 * 60 * 60 * 1000) {
+      localStorage.setItem('eeu-web-logged', 'false');
+      localStorage.setItem('eeu-admin-logged', 'false');
+      localStorage.setItem('eeu-user-role', 'agent');
+      localStorage.removeItem('eeu-team-leader-user');
+      localStorage.removeItem('eeu-last-active');
+      return false;
+    }
+
+    // Refresh last active timestamp on verified active entry
+    localStorage.setItem('eeu-last-active', Date.now().toString());
+    return true;
   });
 
   const [isAdmin, setIsAdmin] = useState<boolean>(() => {
@@ -348,6 +376,7 @@ export default function App() {
     localStorage.setItem('eeu-user-role', role);
     setIsWebLoggedIn(true);
     localStorage.setItem('eeu-web-logged', 'true');
+    localStorage.setItem('eeu-last-active', Date.now().toString());
 
     if (role === 'admin') {
       setIsAdmin(true);
@@ -385,38 +414,97 @@ export default function App() {
     localStorage.setItem('eeu-user-role', 'agent');
     setCurrentTeamLeader(null);
     localStorage.removeItem('eeu-team-leader-user');
+    localStorage.removeItem('eeu-last-active');
     setCurrentTab('dashboard');
   };
 
-  // 3-Hour Inactivity Auto-Logout Timer (10,800,000 ms)
+  // 3-Hour Inactivity Auto-Logout Timer & Wall-Clock Visibility Enforcer (10,800,000 ms)
   useEffect(() => {
     if (!isWebLoggedIn) return;
 
     let timeoutId: NodeJS.Timeout;
+    let intervalId: NodeJS.Timeout;
+    let lastWriteTime = Date.now();
 
-    const resetTimer = () => {
-      clearTimeout(timeoutId);
-      // 3 hours = 3 * 60 * 60 * 1000 ms = 10800000 ms
-      timeoutId = setTimeout(() => {
+    const INACTIVITY_MS = 3 * 60 * 60 * 1000; // 3 hours
+
+    // Checks real wall-clock elapsed time. If >= 3 hours, logs out immediately.
+    const checkExpiry = (): boolean => {
+      const lastActiveStr = localStorage.getItem('eeu-last-active');
+      if (!lastActiveStr) {
         handleLogoutWeb();
-      }, 3 * 60 * 60 * 1000);
+        return true;
+      }
+      const lastActive = parseInt(lastActiveStr, 10);
+      if (isNaN(lastActive) || (Date.now() - lastActive) >= INACTIVITY_MS) {
+        handleLogoutWeb();
+        return true;
+      }
+      return false;
     };
 
-    // Events to track user activity
-    const activityEvents = ['mousedown', 'keydown', 'scroll', 'touchstart', 'mousemove'];
+    // Resets or initializes the timer and updates the last active timestamp
+    const recordActivity = () => {
+      // FIRST: Check if the session has already expired before recording new activity!
+      // This ensures that if the computer was asleep for 12 hours, the first view/click logs out instead of resetting!
+      if (checkExpiry()) {
+        return;
+      }
+
+      const now = Date.now();
+      // Throttle localStorage writes to once every 5 seconds to minimize disk I/O
+      if (now - lastWriteTime > 5000) {
+        lastWriteTime = now;
+        localStorage.setItem('eeu-last-active', now.toString());
+      }
+
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        handleLogoutWeb();
+      }, INACTIVITY_MS);
+    };
+
+    // Check expiry whenever user returns to tab or window gains focus
+    const handleVisibilityOrFocus = () => {
+      if (document.visibilityState === 'visible') {
+        if (!checkExpiry()) {
+          recordActivity();
+        }
+      }
+    };
+
+    // User interaction events: views, clicks, taps, keystrokes, scrolling
+    const activityEvents = ['mousedown', 'click', 'keydown', 'scroll', 'touchstart', 'mousemove'];
 
     activityEvents.forEach(event => {
-      window.addEventListener(event, resetTimer);
+      window.addEventListener(event, recordActivity, { passive: true });
     });
 
-    // Initialize timer on login
-    resetTimer();
+    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+    window.addEventListener('focus', handleVisibilityOrFocus);
+
+    // Periodic heartbeat check every 15 seconds to enforce wall-clock 3-hour expiry
+    intervalId = setInterval(() => {
+      checkExpiry();
+    }, 15000);
+
+    // Initial check and setup on mount/login
+    if (!checkExpiry()) {
+      localStorage.setItem('eeu-last-active', Date.now().toString());
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        handleLogoutWeb();
+      }, INACTIVITY_MS);
+    }
 
     return () => {
       clearTimeout(timeoutId);
+      clearInterval(intervalId);
       activityEvents.forEach(event => {
-        window.removeEventListener(event, resetTimer);
+        window.removeEventListener(event, recordActivity);
       });
+      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+      window.removeEventListener('focus', handleVisibilityOrFocus);
     };
   }, [isWebLoggedIn]);
 
