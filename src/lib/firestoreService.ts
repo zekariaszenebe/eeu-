@@ -509,36 +509,31 @@ export async function resetAllPresetFeedersToMaster() {
 }
 
 /**
- * Subscribes to HubRecords (CSC Address directory) updates in real-time.
+ * Subscribes to HubRecords (CSC Address directory) updates in real-time using Single State Document.
+ * Reduces reads from ~245 documents down to 1 document.
  */
 export function subscribeToHubRecords(onUpdate: (items: HubRecord[]) => void) {
   try {
-    return onSnapshot(hubRecordsCol, (snapshot) => {
-      if (snapshot.empty) {
-        onUpdate(HUB_RECORDS);
-        return;
+    const configDocRef = doc(db, 'systemSettings', 'hubRecords');
+    return onSnapshot(configDocRef, (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        if (Array.isArray(data.list) && data.list.length > 0) {
+          const list = data.list as HubRecord[];
+          list.sort((a, b) => a.no - b.no);
+          setLocal('eeu-hub-records', list);
+          onUpdate(list);
+          return;
+        }
       }
-      const list: HubRecord[] = [];
-      snapshot.forEach((doc) => {
-        const data = doc.data();
-        list.push({
-          no: Number(data.no),
-          region: data.region || '',
-          csc: data.csc || '',
-          address: data.address || '',
-          dummyBp: data.dummyBp || '',
-          rsg: data.rsg || '',
-          dispatcherName: data.dispatcherName || '',
-          dispatcherId: data.dispatcherId || '',
-          customerServiceTlId: data.customerServiceTlId || '',
-          officeLocation: data.officeLocation || ''
-        });
-      });
-      list.sort((a, b) => a.no - b.no);
-      setLocal('eeu-hub-records', list);
-      onUpdate(list);
+
+      // Seed once if document doesn't exist
+      const localCached = getLocal<HubRecord[]>('eeu-hub-records', HUB_RECORDS);
+      localCached.sort((a, b) => a.no - b.no);
+      onUpdate(localCached);
+      setDoc(configDocRef, { list: localCached }).catch(() => {});
     }, (err) => {
-      handleFirestoreError(err, OperationType.GET, 'hubRecords');
+      handleFirestoreError(err, OperationType.GET, 'systemSettings/hubRecords');
       const cached = getLocal<HubRecord[]>('eeu-hub-records', HUB_RECORDS);
       onUpdate(cached);
     });
@@ -554,14 +549,14 @@ export function subscribeToHubRecords(onUpdate: (items: HubRecord[]) => void) {
  */
 export async function updateHubRecordDoc(record: HubRecord) {
   const localList = getLocal<HubRecord[]>('eeu-hub-records', HUB_RECORDS);
-  setLocal('eeu-hub-records', localList.map(item => item.no === record.no ? record : item));
-
+  const updated = localList.map(item => item.no === record.no ? record : item).sort((a, b) => a.no - b.no);
+  setLocal('eeu-hub-records', updated);
 
   try {
-    const docRef = doc(db, 'hubRecords', String(record.no));
-    await setDoc(docRef, record);
+    const configDocRef = doc(db, 'systemSettings', 'hubRecords');
+    await setDoc(configDocRef, { list: updated }, { merge: true });
   } catch (error) {
-    handleFirestoreError(error, OperationType.UPDATE, `hubRecords/${record.no}`);
+    handleFirestoreError(error, OperationType.UPDATE, `systemSettings/hubRecords`);
   }
 }
 
@@ -702,36 +697,35 @@ export async function clearTeamLeaderNotes() {
 }
 
 /**
- * Subscribes to CustomerContacts in real-time.
+ * Subscribes to CustomerContacts in real-time using Single State Document.
  */
 export function subscribeToCustomerContacts(onUpdate: (items: ContactItem[]) => void) {
   try {
-    return onSnapshot(customerContactsCol, (snapshot) => {
-      const list: ContactItem[] = [];
-      snapshot.forEach((doc) => {
-        const data = doc.data();
-        list.push({
-          id: data.id || doc.id,
-          name: data.name,
-          phone: data.phone,
-          category: data.category as any,
-          locationInfo: data.locationInfo,
-          hotlineShortCode: data.hotlineShortCode
-        } as ContactItem);
-      });
+    const configDocRef = doc(db, 'systemSettings', 'customerContacts');
+    return onSnapshot(configDocRef, (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        if (Array.isArray(data.list) && data.list.length > 0) {
+          const list = data.list as ContactItem[];
+          list.sort((a, b) => {
+            const catOrder = { 'head_regional': 0, 'sheger_city': 1, 'regional_hotline': 2 };
+            const aOrder = catOrder[a.category] ?? 3;
+            const bOrder = catOrder[b.category] ?? 3;
+            if (aOrder !== bOrder) return aOrder - bOrder;
+            return a.name.localeCompare(b.name);
+          });
+          setLocal('eeu-customer-contacts', list);
+          onUpdate(list);
+          return;
+        }
+      }
 
-      list.sort((a, b) => {
-        const catOrder = { 'head_regional': 0, 'sheger_city': 1, 'regional_hotline': 2 };
-        const aOrder = catOrder[a.category] ?? 3;
-        const bOrder = catOrder[b.category] ?? 3;
-        if (aOrder !== bOrder) return aOrder - bOrder;
-        return a.name.localeCompare(b.name);
-      });
-
-      setLocal('eeu-customer-contacts', list);
-      onUpdate(list);
+      // Seed once if document doesn't exist
+      const localCached = getLocal<ContactItem[]>('eeu-customer-contacts', INITIAL_CUSTOMER_CONTACTS);
+      onUpdate(localCached);
+      setDoc(configDocRef, { list: localCached }).catch(() => {});
     }, (err) => {
-      handleFirestoreError(err, OperationType.GET, 'customerContacts');
+      handleFirestoreError(err, OperationType.GET, 'systemSettings/customerContacts');
       const cached = getLocal<ContactItem[]>('eeu-customer-contacts', INITIAL_CUSTOMER_CONTACTS);
       onUpdate(cached);
     });
@@ -753,13 +747,15 @@ export async function addCustomerContactDoc(item: Omit<ContactItem, 'id'>) {
   };
 
   const localContacts = getLocal<ContactItem[]>('eeu-customer-contacts', INITIAL_CUSTOMER_CONTACTS);
-  setLocal('eeu-customer-contacts', [record, ...localContacts]);
+  const updated = [record, ...localContacts];
+  setLocal('eeu-customer-contacts', updated);
 
   if (!isFirestoreQuotaExhausted()) {
     try {
-      await setDoc(doc(db, 'customerContacts', newId), record);
+      const configDocRef = doc(db, 'systemSettings', 'customerContacts');
+      await setDoc(configDocRef, { list: updated }, { merge: true });
     } catch (error) {
-      handleFirestoreError(error, OperationType.CREATE, `customerContacts/${newId}`);
+      handleFirestoreError(error, OperationType.CREATE, `systemSettings/customerContacts`);
     }
   }
 
@@ -771,13 +767,15 @@ export async function addCustomerContactDoc(item: Omit<ContactItem, 'id'>) {
  */
 export async function updateCustomerContactDoc(item: ContactItem) {
   const localContacts = getLocal<ContactItem[]>('eeu-customer-contacts', INITIAL_CUSTOMER_CONTACTS);
-  setLocal('eeu-customer-contacts', localContacts.map(c => c.id === item.id ? item : c));
+  const updated = localContacts.map(c => c.id === item.id ? item : c);
+  setLocal('eeu-customer-contacts', updated);
 
   if (!isFirestoreQuotaExhausted()) {
     try {
-      await setDoc(doc(db, 'customerContacts', item.id), item);
+      const configDocRef = doc(db, 'systemSettings', 'customerContacts');
+      await setDoc(configDocRef, { list: updated }, { merge: true });
     } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, `customerContacts/${item.id}`);
+      handleFirestoreError(error, OperationType.UPDATE, `systemSettings/customerContacts`);
     }
   }
 }
@@ -787,13 +785,15 @@ export async function updateCustomerContactDoc(item: ContactItem) {
  */
 export async function deleteCustomerContactDoc(id: string) {
   const localContacts = getLocal<ContactItem[]>('eeu-customer-contacts', INITIAL_CUSTOMER_CONTACTS);
-  setLocal('eeu-customer-contacts', localContacts.filter(c => c.id !== id));
+  const updated = localContacts.filter(c => c.id !== id);
+  setLocal('eeu-customer-contacts', updated);
 
   if (!isFirestoreQuotaExhausted()) {
     try {
-      await deleteDoc(doc(db, 'customerContacts', id));
+      const configDocRef = doc(db, 'systemSettings', 'customerContacts');
+      await setDoc(configDocRef, { list: updated }, { merge: true });
     } catch (error) {
-      handleFirestoreError(error, OperationType.DELETE, `customerContacts/${id}`);
+      handleFirestoreError(error, OperationType.DELETE, `systemSettings/customerContacts`);
     }
   }
 }
