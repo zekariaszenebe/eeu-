@@ -150,8 +150,14 @@ export const InterruptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
       });
     });
 
-    // 2. Immediate synchronization when window/tab is focused or becomes visible
+    // 2. Cooldown-throttled sync when window/tab is focused or becomes visible (e.g. after computer sleep)
+    let lastFocusSyncTime = 0;
     const handleSync = async () => {
+      const now = Date.now();
+      // Enforce at least 60 seconds between manual focus checks to avoid burning reads
+      if (now - lastFocusSyncTime < 60000) return;
+      lastFocusSyncTime = now;
+
       try {
         const latest = await fetchLatestInterruptions();
         setInterruptions(prev => {
@@ -178,14 +184,10 @@ export const InterruptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     window.addEventListener('focus', handleSync);
     document.addEventListener('visibilitychange', handleVisibility);
 
-    // 3. Fallback heartbeat interval (every 8 seconds) to guarantee real-time updates without refreshing
-    const heartbeatTimer = setInterval(handleSync, 8000);
-
     return () => {
       unsub();
       window.removeEventListener('focus', handleSync);
       document.removeEventListener('visibilitychange', handleVisibility);
-      clearInterval(heartbeatTimer);
     };
   }, []);
 
