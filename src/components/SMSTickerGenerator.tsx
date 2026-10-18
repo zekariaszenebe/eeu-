@@ -25,7 +25,7 @@ export function getComplaintSMSText(ticketId: string, lang: TicketLanguage): str
     case 'am':
       return `ውድ ደንበኛችን፣ የአገልግሎት ጥያቄዎ የቲኬት መለያ ቁጥር ${ticketId} ተሰጥቶታል። በአጭር ጊዜ ውስጥ ባለሙያ ወደ እርሶ ይላካል። ለተጨማሪ ጥያቄዎች እባክዎን 905 ላይ ይደውሉ።`;
     case 'om':
-      return `Kabajamoo maamila keenya, gaaffii tajaajila keessaniif lakkoofsi adda baastuu tikkeettii ${ticketId} anitti ni ergamatti bilbilaa keessan bana godhatti obsaan egaa. Gaaffii dabalataatiif 905 irratti bilbilaa.`;
+      return `Kabajamoo maamila keenya, tajaajila gaafattaniif lakkoofsi tikkeettii keessanii ${ticketId} dha. Yeroo gabaabaa keessatti ogeessi gara keessan ni ergama. Gaaffii dabalataaf maaloo 905 irratti bilbilaa.`;
     case 'ti':
       return `ክቡር ደንበኛና፣ ናይ ኣገልግሎት ሕቶኹም ናይ ቲኬት ቁፅሪ ${ticketId} ተዋሂብዎ ኣሎ። ኣብ ሓጺር እዋን ሰብ ሞያ ናብ እትረክብሉ ቦታ ክልኣኽ እዩ። ንተወሳኺ ሕቶታት ብበጃኹም ብ 905 ደውሉ።`;
     case 'en':
@@ -39,7 +39,7 @@ export function getTokenSMSText(token: string, lang: TicketLanguage): string {
     case 'am':
       return `ውድ ደንበኛችን፤ የስማርት ሜትር ቶከን ቁጥርዎ፡ ${token} ነው። እባክዎ የኤሌክትሪክ አገልግሎትዎን ለመሙላት ቶከኑን ሪሞት ላይ ያስገቡ። ለተጨማሪ መረጃ በ905 ይደውሉ።`;
     case 'om':
-      return `Kabajamoo maamila keenya, lakkoofsi tokeenii ismaart meetira keessanii: ${token} dha. Tajaajila elektriikii keessan guuttachuuf maaloo tokeenichaa Rimootii irratti galchaa. Odeeffannoo dabalataatiif 905 irratti bilbilaa.`;
+      return `Kabajamoo maamila keenya, anniisaa elektiriikaa bittaniif lakkoofsi tookenii keessanii: ${token} dha. Anniisaa elektriikii keessan guuttachuuf maaloo tookenicha Riimootii irratti galchaa. Odeeffannoo dabalataatiif 905 irratti bilbilaa.`;
     case 'ti':
       return `ክቡር ደንበኛና፣ ናይ ስማርት ሜተር ቶከን ቁፅርኹም፡ ${token} እዩ። ብበጃኹም ናይ ኤሌክትሪክ ኣገልግሎትኹም ንምምላእ ቶከን ኣብ ሪሞት የእትዉ። ንተወሳኺ ሓበሬታ ብ 905 ደውሉ።`;
     case 'en':
