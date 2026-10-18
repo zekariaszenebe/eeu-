@@ -7,6 +7,8 @@ import {
 
 // Context
 import { useInterruptions } from './context/InterruptionContext';
+import { useTheme } from './context/ThemeContext';
+import ThemeToggle from './components/ThemeToggle';
 
 import { FeederInterruption, InterruptionType, InterruptionStatus, TeamLeaderNote, ContactItem, TeamLeaderUser, UserRole, isPlannedOrOperational } from './types';
 import { INITIAL_DISTRICTS, INITIAL_FEEDERS_LIST, INITIAL_CUSTOMER_CONTACTS } from './data/mockData';
@@ -57,11 +59,9 @@ import WebLoginScreen from './components/WebLoginScreen';
 import FeedbackModal from './components/FeedbackModal';
 
 export default function App() {
-  // 1. Theme State (strictly light mode)
-  const isDarkMode = false;
-  const toggleTheme = () => {
-    // Theme toggling disabled to preserve strictly light mode
-  };
+  // 1. Theme State
+  const { theme, resolvedTheme, setTheme, toggleTheme } = useTheme();
+  const isDarkMode = resolvedTheme === 'dark';
 
   // Feedback Modal State
   const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState<boolean>(false);
@@ -560,6 +560,7 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-2">
+            <ThemeToggle variant="icon" />
             {/* Mobile Hamburger menu */}
             <button
               id="mobile-menu-hamburger"
@@ -715,6 +716,9 @@ export default function App() {
 
               {/* User Profile Pill Card & Action Buttons */}
               <div className="flex items-center gap-2.5">
+                {/* Theme Toggle Button */}
+                <ThemeToggle variant="dropdown" />
+
                 {/* Feedback Button */}
                 <button
                   id="header-feedback-btn"

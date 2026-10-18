@@ -8,10 +8,20 @@
     <meta name="description" content="An Electricity Utility Call Center Feeder Interruption Management System with live updates, admin controls, agent filters, and statistics, inspired by Ethiopian Electric Utility design." />
     <meta property="og:title" content="EEU Feeder Interruption Dashboard" />
     <meta property="og:description" content="An Electricity Utility Call Center Feeder Interruption Management System with live updates, admin controls, agent filters, and statistics, inspired by Ethiopian Electric Utility design." />
+    <script>
+      try {
+        const theme = localStorage.getItem('eeu_theme');
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        if (theme === 'dark' || (!theme && prefersDark) || (theme === 'system' && prefersDark)) {
+          document.documentElement.classList.add('dark');
+        } else {
+          document.documentElement.classList.remove('dark');
+        }
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
-
