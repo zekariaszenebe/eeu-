@@ -480,8 +480,8 @@ export default function WebLoginScreen({ onLoginSuccess, teamLeaders = [] }: Web
               </div>
             </div>
             <div className="space-y-2.5 text-xs text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-slate-800/80 p-4 rounded-2xl border border-gray-200/80 dark:border-slate-700 font-mono">
-              <p><strong>Hotline:</strong> 905 / +251 11 123 4567</p>
-              <p><strong>IT Desk Email:</strong> support@eeu.gov.et</p>
+              <p><strong>Hotline:</strong> +251991182141</p>
+              <p><strong>Email:</strong> zekariaszenebe21@gmail.com</p>
               <p><strong>HQ Location:</strong> EEU HQ - ICT Department, Addis Ababa</p>
               <p><strong>Support Availability:</strong> 24/7 Continuous Operation</p>
             </div>

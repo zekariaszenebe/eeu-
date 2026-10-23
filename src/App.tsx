@@ -21,6 +21,7 @@ import {
   addInterruptionDoc,
   updateInterruptionDoc,
   deleteInterruptionDoc,
+  savePresetFeedersList,
   addPresetFeederDoc,
   deletePresetFeederDoc,
   resetAllPresetFeedersToMaster,
@@ -84,14 +85,7 @@ export default function App() {
       try {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          const combined = [...parsed];
-          for (const item of INITIAL_FEEDERS_LIST) {
-            const prefix = item.split(' (')[0].trim();
-            if (!combined.some((s: string) => s.startsWith(prefix))) {
-              combined.push(item);
-            }
-          }
-          return combined;
+          return parsed;
         }
       } catch (e) {
         console.error('Failed to load feeders list from localStorage', e);
@@ -206,10 +200,6 @@ export default function App() {
     seedInitialDataIfEmpty();
   }, []);
 
-  useEffect(() => {
-    document.documentElement.classList.remove('dark');
-    localStorage.removeItem('eeu-theme');
-  }, []);
 
   // Real-time synchronization across all terminals
   useEffect(() => {
@@ -252,22 +242,25 @@ export default function App() {
       setFeedersList(newList);
       localStorage.setItem('eeu-feeders-list-v4', JSON.stringify(newList));
       
+      const success = await savePresetFeedersList(newList);
+      if (!success) {
+        triggerToast('Database Error', 'Failed to save feeder updates to Firestore', 'warn');
+        return;
+      }
+
       const added = newList.filter(x => !prevList.includes(x));
       const removed = prevList.filter(x => !newList.includes(x));
 
-      for (const item of removed) {
-        await deletePresetFeederDoc(item);
-      }
-      for (const item of added) {
-        await addPresetFeederDoc(item);
-      }
-      if (added.length > 0) {
+      if (added.length > 0 && removed.length > 0) {
         const addedName = added[0].split(' (')[0];
-        triggerToast('Feeder Preset Added', `New feeder "${addedName}" registered to database`, 'success');
+        triggerToast('Feeder Preset Updated', `Feeder "${addedName}" saved to database`, 'success');
+      } else if (added.length > 0) {
+        const addedName = added[0].split(' (')[0];
+        triggerToast('Feeder Preset Added', `New feeder "${addedName}" saved to database`, 'success');
       } else if (removed.length > 0) {
         triggerToast('Feeder Preset Removed', 'Feeder line removed from database', 'info');
       } else {
-        triggerToast('Feeder Preset Updated', 'Feeder line database updated', 'success');
+        triggerToast('Feeder Preset Updated', 'Feeder records database updated', 'success');
       }
     } catch (e) {
       console.error(e);

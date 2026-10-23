@@ -75,7 +75,7 @@ interface AdminPanelProps {
   onUpdateInterruption: (id: string, entry: Partial<FeederInterruption>) => void;
   onDeleteInterruption: (id: string) => void;
   feedersList?: string[];
-  onUpdateFeedersList?: (list: string[]) => void;
+  onUpdateFeedersList?: (list: string[]) => Promise<void> | void;
   onResetMasterFeeders?: () => void;
   teamLeaders?: TeamLeaderUser[];
   onAddTeamLeader?: (tl: Omit<TeamLeaderUser, 'id' | 'createdAt'>) => void;
@@ -110,10 +110,12 @@ export default function AdminPanel({
   // Dynamic Base Feeder entries
   const canEditFeeders = isAdmin || userRole === 'admin';
   const activeFeeders = feedersList || INITIAL_FEEDERS_LIST;
-  const handleUpdateFeeders = (newList: string[]) => {
+  const [isSavingFeeder, setIsSavingFeeder] = useState(false);
+
+  const handleUpdateFeeders = async (newList: string[]) => {
     if (!canEditFeeders) return;
     if (onUpdateFeedersList) {
-      onUpdateFeedersList(newList);
+      await onUpdateFeedersList(newList);
     }
   };
 
@@ -368,23 +370,22 @@ export default function AdminPanel({
     setShowFeederModal(true);
   };
 
-  const handleFeederFormSubmit = (e: React.FormEvent) => {
+  const handleFeederFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!canEditFeeders) {
       setFeederFormError('Only administrators can modify the Preset Feeder Line Records Database.');
       return;
     }
     if (!feederFormSubstation.trim()) {
-      setFeederFormError('Please enter Substation Details.');
+      setFeederFormError('Please enter Substation Details / Feeder Name.');
       return;
     }
     if (!feederFormCode.trim()) {
-      setFeederFormError('Please enter a Feeder Identifier.');
+      setFeederFormError('Please enter a Feeder Identifier / Number.');
       return;
     }
 
     const fullFeederLine = `${feederFormSubstation.trim()} - ${feederFormCode.trim()}`;
-
     const combined = `${fullFeederLine}${feederFormArea.trim() ? ` (${feederFormArea.trim()})` : ''} | ${feederFormDirection}`;
 
     const newList = [...activeFeeders];
@@ -400,7 +401,7 @@ export default function AdminPanel({
       const normOldLine = normalizeFeederName(oldParsed.feederLine);
       const normOldStr = normalizeFeederName(oldFeederStr);
 
-      interruptions.forEach((item) => {
+      for (const item of interruptions) {
         const normItem = normalizeFeederName(item.feederName);
         const isMatch = normItem === normOldLine || 
                         normItem === normOldStr || 
@@ -419,10 +420,10 @@ export default function AdminPanel({
             updates.direction = newParsed.direction as any;
           }
           if (Object.keys(updates).length > 0) {
-            onUpdateInterruption(item.id, updates);
+            await onUpdateInterruption(item.id, updates);
           }
         }
-      });
+      }
     } else {
       // Check for duplicate names
       const duplicate = newList.some(f => parseFeeder(f).feederLine.toLowerCase() === fullFeederLine.toLowerCase());
@@ -433,14 +434,21 @@ export default function AdminPanel({
       newList.unshift(combined);
     }
 
-    handleUpdateFeeders(newList);
-    setShowFeederModal(false);
+    try {
+      setIsSavingFeeder(true);
+      await handleUpdateFeeders(newList);
+      setShowFeederModal(false);
+    } catch (err: any) {
+      setFeederFormError(err?.message || 'Failed to save feeder changes to database.');
+    } finally {
+      setIsSavingFeeder(false);
+    }
   };
 
-  const handleDeleteFeeder = (feederStr: string) => {
+  const handleDeleteFeeder = async (feederStr: string) => {
     if (!canEditFeeders) return;
     const newList = activeFeeders.filter((f) => f !== feederStr);
-    handleUpdateFeeders(newList);
+    await handleUpdateFeeders(newList);
   };
 
   // Logic to process login
@@ -1830,17 +1838,20 @@ export default function AdminPanel({
                 <button
                   id="feeder-form-cancel-btn"
                   type="button"
+                  disabled={isSavingFeeder}
                   onClick={() => setShowFeederModal(false)}
-                  className="px-4 py-2.5 text-xs font-semibold text-gray-500 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-all cursor-pointer"
+                  className="px-4 py-2.5 text-xs font-semibold text-gray-500 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-all cursor-pointer disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   id="feeder-form-submit-btn"
                   type="submit"
-                  className="px-6 py-2.5 bg-eeu-green hover:bg-eeu-green-hover text-white rounded-xl text-xs font-semibold transition-all shadow-md shadow-eeu-green/15 cursor-pointer"
+                  disabled={isSavingFeeder}
+                  className="px-6 py-2.5 bg-eeu-green hover:bg-eeu-green-hover disabled:opacity-60 text-white rounded-xl text-xs font-semibold transition-all shadow-md shadow-eeu-green/15 cursor-pointer flex items-center gap-2"
                 >
-                  {editingFeederIdx !== null ? 'Save Changes' : 'Register Preset'}
+                  {isSavingFeeder && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
+                  <span>{isSavingFeeder ? 'Saving to Database...' : editingFeederIdx !== null ? 'Save Changes' : 'Register Preset'}</span>
                 </button>
               </div>
             </form>

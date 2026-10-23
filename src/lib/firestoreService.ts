@@ -442,9 +442,28 @@ export async function deleteInterruptionDoc(id: string) {
 }
 
 /**
+ * Saves and persists the complete list of preset feeder lines directly to Firestore.
+ * When an admin edits Feeder Name, Direction, Feeder Number, and Affected Areas,
+ * this function atomically writes the updated list to 'systemSettings/presetFeeders'.
+ */
+export async function savePresetFeedersList(newList: string[]): Promise<boolean> {
+  const sorted = [...newList].sort();
+  setLocal('eeu-feeders-list-v4', sorted);
+
+  try {
+    const configDocRef = doc(db, 'systemSettings', 'presetFeeders');
+    await setDoc(configDocRef, { list: sorted, lastUpdated: new Date().toISOString() });
+    return true;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, 'systemSettings/presetFeeders');
+    return false;
+  }
+}
+
+/**
  * Adds a new preset feeder line.
  */
-export async function addPresetFeederDoc(feederStr: string) {
+export async function addPresetFeederDoc(feederStr: string): Promise<boolean> {
   const localFeeders = getLocal<string[]>('eeu-feeders-list-v4', INITIAL_FEEDERS_LIST);
   let updated = [...localFeeders];
   if (!updated.includes(feederStr)) {
@@ -455,56 +474,64 @@ export async function addPresetFeederDoc(feederStr: string) {
 
   try {
     const configDocRef = doc(db, 'systemSettings', 'presetFeeders');
-    await setDoc(configDocRef, { list: updated }, { merge: true });
+    await setDoc(configDocRef, { list: updated, lastUpdated: new Date().toISOString() });
+    return true;
   } catch (error) {
     handleFirestoreError(error, OperationType.CREATE, 'systemSettings/presetFeeders');
+    return false;
   }
 }
 
 /**
  * Deletes a preset feeder line using single consolidated document (0 extra reads).
  */
-export async function deletePresetFeederDoc(feederStr: string) {
+export async function deletePresetFeederDoc(feederStr: string): Promise<boolean> {
   const localFeeders = getLocal<string[]>('eeu-feeders-list-v4', INITIAL_FEEDERS_LIST);
   const updated = localFeeders.filter(f => f !== feederStr).sort();
   setLocal('eeu-feeders-list-v4', updated);
 
   try {
     const configDocRef = doc(db, 'systemSettings', 'presetFeeders');
-    await setDoc(configDocRef, { list: updated }, { merge: true });
+    await setDoc(configDocRef, { list: updated, lastUpdated: new Date().toISOString() });
+    return true;
   } catch (error) {
     handleFirestoreError(error, OperationType.DELETE, 'systemSettings/presetFeeders');
+    return false;
   }
 }
 
 /**
  * Updates a preset feeder line using single consolidated document (0 extra reads).
  */
-export async function updatePresetFeederDoc(oldFeederStr: string, newFeederStr: string) {
+export async function updatePresetFeederDoc(oldFeederStr: string, newFeederStr: string): Promise<boolean> {
   const localFeeders = getLocal<string[]>('eeu-feeders-list-v4', INITIAL_FEEDERS_LIST);
   const updated = localFeeders.map(f => f === oldFeederStr ? newFeederStr : f).sort();
   setLocal('eeu-feeders-list-v4', updated);
 
   try {
     const configDocRef = doc(db, 'systemSettings', 'presetFeeders');
-    await setDoc(configDocRef, { list: updated }, { merge: true });
+    await setDoc(configDocRef, { list: updated, lastUpdated: new Date().toISOString() });
+    return true;
   } catch (error) {
     handleFirestoreError(error, OperationType.UPDATE, 'systemSettings/presetFeeders');
+    return false;
   }
 }
 
 /**
  * Resets and overwrites preset feeders with the complete 248 master list in a single write.
  */
-export async function resetAllPresetFeedersToMaster() {
+export async function resetAllPresetFeedersToMaster(): Promise<boolean> {
   setLocal('eeu-feeders-list-v4', INITIAL_FEEDERS_LIST);
   setLocal('eeu-feeders-version', FEEDERS_VERSION);
 
   try {
     const configDocRef = doc(db, 'systemSettings', 'presetFeeders');
-    await setDoc(configDocRef, { list: INITIAL_FEEDERS_LIST });
+    await setDoc(configDocRef, { list: INITIAL_FEEDERS_LIST, lastUpdated: new Date().toISOString() });
+    return true;
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, 'systemSettings/presetFeeders');
+    return false;
   }
 }
 
