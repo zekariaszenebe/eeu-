@@ -1,6 +1,6 @@
 import React from 'react';
 import { ShieldAlert, Zap, CalendarClock, Gauge, Server } from 'lucide-react';
-import { FeederInterruption, InterruptionType, InterruptionStatus, normalizeInterruptionType } from '../types';
+import { FeederInterruption, InterruptionType, normalizeInterruptionType, isFeederRestored } from '../types';
 import { EarthFaultIcon } from './AgentView';
 
 interface StatsGridProps {
@@ -8,27 +8,27 @@ interface StatsGridProps {
 }
 
 export default function StatsGrid({ interruptions }: StatsGridProps) {
-  // Compute metrics dynamically with normalized types
-  const activeCount = interruptions.filter(i => i.status !== InterruptionStatus.RESTORED).length;
+  // Compute metrics dynamically with normalized types (excluding restored/live feeders)
+  const activeCount = interruptions.filter(i => !isFeederRestored(i)).length;
   
   const earthFaults = interruptions.filter(
-    i => i.status !== InterruptionStatus.RESTORED && normalizeInterruptionType(i.type) === InterruptionType.EARTH_FAULT
+    i => !isFeederRestored(i) && normalizeInterruptionType(i.type) === InterruptionType.EARTH_FAULT
   ).length;
 
   const shortCircuits = interruptions.filter(
-    i => i.status !== InterruptionStatus.RESTORED && normalizeInterruptionType(i.type) === InterruptionType.SHORT_CIRCUIT
+    i => !isFeederRestored(i) && normalizeInterruptionType(i.type) === InterruptionType.SHORT_CIRCUIT
   ).length;
 
   const overCurrents = interruptions.filter(
-    i => i.status !== InterruptionStatus.RESTORED && normalizeInterruptionType(i.type) === InterruptionType.OVER_CURRENT
+    i => !isFeederRestored(i) && normalizeInterruptionType(i.type) === InterruptionType.OVER_CURRENT
   ).length;
 
   const sheddingAndLdc = interruptions.filter(
-    i => i.status !== InterruptionStatus.RESTORED && (normalizeInterruptionType(i.type) === InterruptionType.SHEDDING || normalizeInterruptionType(i.type) === InterruptionType.LDC)
+    i => !isFeederRestored(i) && (normalizeInterruptionType(i.type) === InterruptionType.SHEDDING || normalizeInterruptionType(i.type) === InterruptionType.LDC)
   ).length;
 
   const planned = interruptions.filter(
-    i => i.status !== InterruptionStatus.RESTORED && (normalizeInterruptionType(i.type) === InterruptionType.PLANNED_INTERRUPTION || normalizeInterruptionType(i.type) === InterruptionType.OPERATIONAL_INTERRUPTION)
+    i => !isFeederRestored(i) && (normalizeInterruptionType(i.type) === InterruptionType.PLANNED_INTERRUPTION || normalizeInterruptionType(i.type) === InterruptionType.OPERATIONAL_INTERRUPTION)
   ).length;
 
   const statCards = [

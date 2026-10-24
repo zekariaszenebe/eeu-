@@ -4,10 +4,11 @@ import {
   RefreshCw, Info, MapPin, Zap, Clock, ShieldCheck, HelpCircle, Download, Copy, Check, Building,
   UserCheck, Users, Eye, EyeOff, UserPlus, KeyRound, Shield, Search
 } from 'lucide-react';
-import { FeederInterruption, InterruptionType, InterruptionStatus, stripBrackets, TeamLeaderUser, UserRole, normalizeInterruptionType, isPlannedOrOperational } from '../types';
+import { FeederInterruption, InterruptionType, InterruptionStatus, stripBrackets, TeamLeaderUser, UserRole, normalizeInterruptionType, isPlannedOrOperational, isFeederRestored } from '../types';
 import { INITIAL_DISTRICTS, INITIAL_FEEDERS_LIST } from '../data/mockData';
 import { InterruptionTypeBadge, getCardinalDirection } from './AgentView';
 import { LanguageMode, translateAmharicLocation, formatLocationDisplay } from '../utils/locationLanguage';
+import { useInterruptions } from '../context/InterruptionContext';
 
 export const DIRECTIONS = ['North', 'East', 'West', 'South', 'Sheger Region'];
 
@@ -718,18 +719,39 @@ export default function AdminPanel({
     );
   });
 
+  // Outage filter state: default to 'active_only' so restored feeders are forgotten from the live disruptions board
+  const [outageFilter, setOutageFilter] = useState<'active_only' | 'all'>('active_only');
+  const { clearAllRestoredFeeders } = useInterruptions();
+  const [isClearingRestored, setIsClearingRestored] = useState(false);
+
+  const activeOutagesCount = interruptions.filter(i => !isFeederRestored(i)).length;
+  const restoredOutagesCount = interruptions.filter(i => isFeederRestored(i)).length;
+
+  const handleClearRestoredClick = async () => {
+    if (window.confirm('Are you sure you want to permanently clear all restored feeder records from the database?')) {
+      setIsClearingRestored(true);
+      try {
+        await clearAllRestoredFeeders();
+      } finally {
+        setIsClearingRestored(false);
+      }
+    }
+  };
+
   // Sort interruptions: Active disruptions on top, Restored feeders pushed to the bottom
-  const sortedInterruptions = [...interruptions].sort((a, b) => {
-    const aRestored = a.status === InterruptionStatus.RESTORED;
-    const bRestored = b.status === InterruptionStatus.RESTORED;
+  const sortedInterruptions = [...interruptions]
+    .filter(item => outageFilter === 'all' || !isFeederRestored(item))
+    .sort((a, b) => {
+      const aRestored = isFeederRestored(a);
+      const bRestored = isFeederRestored(b);
 
-    // If one is restored and the other isn't, non-restored comes first
-    if (!aRestored && bRestored) return -1;
-    if (aRestored && !bRestored) return 1;
+      // If one is restored and the other isn't, non-restored comes first
+      if (!aRestored && bRestored) return -1;
+      if (aRestored && !bRestored) return 1;
 
-    // Within the same status group, sort by lastUpdated descending (newest first)
-    return (b.lastUpdated || '').localeCompare(a.lastUpdated || '');
-  });
+      // Within the same status group, sort by lastUpdated descending (newest first)
+      return (b.lastUpdated || '').localeCompare(a.lastUpdated || '');
+    });
 
   return (
     <div id="admin-management-view" className="space-y-6">
@@ -872,11 +894,53 @@ export default function AdminPanel({
       {/* Grid Interruption Direct List Control */}
       {adminSubTab === 'outages' && (
         <div className="glass-card rounded-2xl overflow-hidden font-sans">
-        <div className="p-5 border-b border-gray-200/30 dark:border-gray-800/30 bg-transparent flex items-center justify-between flex-wrap gap-2">
-          <h3 className="font-display font-medium text-xs text-gray-600 dark:text-gray-400 uppercase tracking-wider">
-            All Listed Feeder Disruptions ({interruptions.length})
-          </h3>
-          <div className="flex items-center gap-2">
+        <div className="p-5 border-b border-gray-200/30 dark:border-gray-800/30 bg-transparent flex items-center justify-between flex-wrap gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
+            <h3 className="font-display font-medium text-xs text-gray-600 dark:text-gray-400 uppercase tracking-wider">
+              {outageFilter === 'active_only' ? `Active Feeder Disruptions (${sortedInterruptions.length})` : `All Listed Disruptions (${interruptions.length})`}
+            </h3>
+
+            {/* Filter Toggle Pill */}
+            <div className="flex items-center p-0.5 bg-gray-100 dark:bg-gray-950 rounded-xl border border-gray-200 dark:border-gray-800 text-[11px] font-semibold">
+              <button
+                type="button"
+                onClick={() => setOutageFilter('active_only')}
+                className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
+                  outageFilter === 'active_only'
+                    ? 'bg-white dark:bg-gray-800 text-eeu-green shadow-xs font-bold'
+                    : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'
+                }`}
+              >
+                Active Only ({activeOutagesCount})
+              </button>
+              <button
+                type="button"
+                onClick={() => setOutageFilter('all')}
+                className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
+                  outageFilter === 'all'
+                    ? 'bg-white dark:bg-gray-800 text-eeu-green shadow-xs font-bold'
+                    : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'
+                }`}
+              >
+                All Records ({interruptions.length})
+              </button>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            {restoredOutagesCount > 0 && (
+              <button
+                type="button"
+                onClick={handleClearRestoredClick}
+                disabled={isClearingRestored}
+                className="px-3 py-1 text-xs font-semibold text-red-600 hover:text-red-700 bg-red-500/10 hover:bg-red-500/20 border border-red-200 dark:border-red-900/40 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                title="Permanently remove all restored records"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>{isClearingRestored ? 'Clearing...' : `Clear Restored (${restoredOutagesCount})`}</span>
+              </button>
+            )}
+
             <span className="text-[10px] font-sans font-bold text-emerald-650 bg-emerald-500/10 dark:bg-emerald-950/30 px-2 py-0.5 rounded border border-emerald-500/25">
               Admin: Write Access Active
             </span>
@@ -909,7 +973,7 @@ export default function AdminPanel({
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-800/60 text-sm">
                 {sortedInterruptions.map((item) => {
-                  const isRestored = item.status === InterruptionStatus.RESTORED;
+                  const isRestored = isFeederRestored(item);
                   return (
                     <tr 
                       key={item.id} 

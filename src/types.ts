@@ -61,6 +61,24 @@ export enum InterruptionStatus {
   RESTORED = 'Restored'
 }
 
+export function isFeederRestored(item: FeederInterruption | null | undefined): boolean {
+  if (!item || !item.status) return false;
+  const s = String(item.status).trim().toLowerCase();
+  return s === 'restored' || s === 'resolved' || s === 'cleared' || s === 'normal' || s === 'live';
+}
+
+export function normalizeInterruptionStatus(raw: unknown): InterruptionStatus {
+  if (!raw || typeof raw !== 'string') return InterruptionStatus.ACTIVE;
+  const s = raw.trim().toLowerCase();
+  if (s === 'restored' || s === 'resolved' || s === 'cleared' || s === 'normal' || s === 'live') {
+    return InterruptionStatus.RESTORED;
+  }
+  if (s === 'partially connected' || s.includes('investigation') || s === 'under investigation') {
+    return InterruptionStatus.UNDER_INVESTIGATION;
+  }
+  return InterruptionStatus.ACTIVE;
+}
+
 export interface FeederInterruption {
   id: string;
   feederName: string;

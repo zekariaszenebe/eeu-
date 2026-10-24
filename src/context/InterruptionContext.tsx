@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { FeederInterruption, InterruptionStatus, normalizeInterruptionType } from '../types';
+import { FeederInterruption, InterruptionStatus, normalizeInterruptionType, isFeederRestored } from '../types';
 import { getCardinalDirection } from '../utils/direction';
 import { 
   addInterruptionDoc, 
@@ -7,7 +7,9 @@ import {
   deleteInterruptionDoc, 
   subscribeToInterruptions,
   fetchLatestInterruptions,
-  seedInitialDataIfEmpty
+  cleanOutagesList,
+  clearAllRestoredInterruptionsDoc,
+  recordDeletedInterruptionId
 } from '../lib/firestoreService';
 
 interface InterruptionContextType {
@@ -16,6 +18,7 @@ interface InterruptionContextType {
   addInterruption: (entry: Omit<FeederInterruption, 'id' | 'lastUpdated'>) => Promise<void>;
   updateInterruption: (id: string, entry: Partial<FeederInterruption>) => Promise<void>;
   deleteInterruption: (id: string) => Promise<void>;
+  clearAllRestoredFeeders: () => Promise<void>;
   triggerToast: (title: string, desc: string, type?: 'info' | 'success' | 'warn') => void;
   liveToast: { title: string; desc: string; type: 'info' | 'success' | 'warn' } | null;
   setLiveToast: React.Dispatch<React.SetStateAction<{ title: string; desc: string; type: 'info' | 'success' | 'warn' } | null>>;
@@ -39,40 +42,17 @@ export const InterruptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const [interruptions, setInterruptions] = useState<FeederInterruption[]>(() => {
     if (typeof window === 'undefined') return [];
     const saved = localStorage.getItem('eeu-interruptions');
-    let loaded: FeederInterruption[] = [];
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) {
-          loaded = parsed;
+          return cleanOutagesList(parsed);
         }
       } catch (e) {
         console.error('Failed to parse interruptions from localStorage', e);
       }
     }
-    
-    // Purge legacy mock outage IDs (f-1 through f-13) and deduplicate
-    const legacyMockIds = new Set(['f-1','f-2','f-3','f-4','f-5','f-6','f-7','f-8','f-9','f-10','f-11','f-12','f-13']);
-    const seen = new Set<string>();
-    const cleanList = loaded.filter((item) => {
-      if (!item || !item.id || seen.has(item.id)) return false;
-      // Exclude legacy mock items so they never glitch or display on refresh
-      if (legacyMockIds.has(item.id) || /^f-\d{1,2}$/.test(item.id)) return false;
-      seen.add(item.id);
-      return true;
-    }).map(item => ({
-      ...item,
-      type: normalizeInterruptionType(item.type)
-    }));
-
-    // If cleaned list differs from saved, sync cleaned list back to localStorage
-    if (saved && cleanList.length !== loaded.length) {
-      try {
-        localStorage.setItem('eeu-interruptions', JSON.stringify(cleanList));
-      } catch {}
-    }
-
-    return cleanList;
+    return [];
   });
 
   const [liveToast, setLiveToast] = useState<{ title: string; desc: string; type: 'info' | 'success' | 'warn' } | null>(null);
@@ -89,14 +69,20 @@ export const InterruptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     if (!channel) return;
     const handleMessage = (event: MessageEvent) => {
       const { type, data } = event.data || {};
-      if (type === 'SYNC_INTERRUPTIONS' && Array.isArray(data)) {
-        const normalized = data.map((item: FeederInterruption) => ({
-          ...item,
-          type: normalizeInterruptionType(item.type)
-        }));
-        setInterruptions(normalized);
+      if (type === 'DELETE_INTERRUPTION' && data && data.id) {
+        recordDeletedInterruptionId(data.id);
+        setInterruptions(prev => {
+          const next = prev.filter(i => i.id !== data.id);
+          try {
+            localStorage.setItem('eeu-interruptions', JSON.stringify(next));
+          } catch {}
+          return next;
+        });
+      } else if (type === 'SYNC_INTERRUPTIONS' && Array.isArray(data)) {
+        const cleaned = cleanOutagesList(data);
+        setInterruptions(cleaned);
         try {
-          localStorage.setItem('eeu-interruptions', JSON.stringify(normalized));
+          localStorage.setItem('eeu-interruptions', JSON.stringify(cleaned));
         } catch (e) {
           console.error('Failed to persist synced data to localStorage', e);
         }
@@ -115,10 +101,7 @@ export const InterruptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
         try {
           const parsed = JSON.parse(e.newValue);
           if (Array.isArray(parsed)) {
-            setInterruptions(parsed.map(item => ({
-              ...item,
-              type: normalizeInterruptionType(item.type)
-            })));
+            setInterruptions(cleanOutagesList(parsed));
           }
         } catch (err) {
           console.error('Storage sync parsing error:', err);
@@ -305,18 +288,18 @@ export const InterruptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }
   };
 
-  // Delete interruption with local persistence fallback
+  // Delete interruption with permanent tombstone and instant broadcast
   const deleteInterruption = async (id: string) => {
     let target: FeederInterruption | undefined;
-    let backupList: FeederInterruption[] = [];
+    recordDeletedInterruptionId(id);
 
     setInterruptions(prev => {
-      backupList = prev;
       target = prev.find(i => i.id === id);
       const nextList = prev.filter(i => i.id !== id);
       try {
         localStorage.setItem('eeu-interruptions', JSON.stringify(nextList));
       } catch (e) {}
+      channel?.postMessage({ type: 'DELETE_INTERRUPTION', data: { id } });
       channel?.postMessage({ type: 'SYNC_INTERRUPTIONS', data: nextList });
       return nextList;
     });
@@ -324,13 +307,32 @@ export const InterruptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     try {
       await deleteInterruptionDoc(id);
       if (target) {
-        triggerToast('Record Removed', `${target.feederName} interruption cleared from dispatch lists.`, 'info');
+        triggerToast('Record Removed', `${target.feederName} interruption permanently cleared.`, 'info');
       }
     } catch (e) {
       console.error('Firestore deleteInterruptionDoc failed, keeping deletion locally:', e);
       if (target) {
         triggerToast('Deleted Locally', `${target.feederName} removed locally.`, 'info');
       }
+    }
+  };
+
+  // Permanently clear all restored feeders from active lists & database
+  const clearAllRestoredFeeders = async () => {
+    try {
+      const count = await clearAllRestoredInterruptionsDoc();
+      setInterruptions(prev => {
+        const nextList = prev.filter(i => !isFeederRestored(i));
+        try {
+          localStorage.setItem('eeu-interruptions', JSON.stringify(nextList));
+        } catch {}
+        channel?.postMessage({ type: 'SYNC_INTERRUPTIONS', data: nextList });
+        return nextList;
+      });
+      triggerToast('Restored Records Cleared', `Successfully purged ${count} restored feeders. Grid is clean and live.`, 'success');
+    } catch (e) {
+      console.error('Failed to clear restored feeders:', e);
+      triggerToast('Clear Failed', 'Could not clear restored feeder records.', 'warn');
     }
   };
 
@@ -341,6 +343,7 @@ export const InterruptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
       addInterruption,
       updateInterruption,
       deleteInterruption,
+      clearAllRestoredFeeders,
       triggerToast,
       liveToast,
       setLiveToast

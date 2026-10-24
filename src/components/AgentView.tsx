@@ -8,7 +8,7 @@ import {
   Undo, Redo, Bold, Italic, Underline, Strikethrough, AlignLeft, AlignCenter, AlignRight, AlignJustify, Table, ChevronDown,
   Activity, Gauge, PowerOff, Server
 } from 'lucide-react';
-import { FeederInterruption, InterruptionType, InterruptionStatus, normalizeInterruptionType, stripBrackets, TeamLeaderNote, isPlannedOrOperational } from '../types';
+import { FeederInterruption, InterruptionType, InterruptionStatus, normalizeInterruptionType, stripBrackets, TeamLeaderNote, isPlannedOrOperational, isFeederRestored } from '../types';
 import { INITIAL_DISTRICTS } from '../data/mockData';
 import { INITIAL_FEEDERS_LIST } from '../data/feedersList';
 import { addTeamLeaderNoteDoc, updateTeamLeaderNoteDoc, deleteTeamLeaderNoteDoc } from '../lib/firestoreService';
@@ -662,11 +662,11 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
   // Direct source of truth for interruptions: use passed interruptions prop if provided
   const displayInterruptions = interruptions !== undefined ? interruptions : liveInterruptions;
 
-  // Process filters & search query - The Interruption Dashboard only displays ACTIVE / UNDER_INVESTIGATION outages.
-  // Restored outages are automatically cleared from the dashboard and archived in the Restored Feeders tab.
+  // Process filters & search query - The Live Interruption Dashboard ONLY displays currently active outages.
+  // Restored feeders are automatically forgotten from the live grid (power is live) and stored in Restored Feeders archive.
   const filteredItems = displayInterruptions.filter((item) => {
-    // Exclude restored items from the active interruption dashboard
-    if (item.status === InterruptionStatus.RESTORED) {
+    // Forget restored feeders completely from live dashboard
+    if (isFeederRestored(item)) {
       return false;
     }
 
@@ -716,7 +716,7 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
     }
   });
 
-  // Extract unique locations from interruptions for catalog directory
+  // Extract unique locations from ACTIVE interruptions only - forget restored feeders
   const uniqueLocations: Array<{
     name: string;
     englishName: string;
@@ -726,7 +726,7 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
     status: InterruptionStatus;
   }> = [];
 
-  displayInterruptions.forEach((item) => {
+  displayInterruptions.filter(item => !isFeederRestored(item)).forEach((item) => {
     // Combine explicit affectedArea with the feeder's master preset areas (e.g. MEK-02 covers Lebu, Chad Embassy, 72 Menbere...)
     const presetAreas = getPresetAreasForFeeder(item.feederName);
     const combinedAreaStr = [item.affectedArea, presetAreas].filter(Boolean).join(' ፤ ');
@@ -796,8 +796,7 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
     return matchesSearch && matchesDistrict;
   });
 
-
-  // Compute direction statistics based on all current active interruptions
+  // Compute direction statistics based on ALL current active interruptions
   const directionStats: Record<string, { active: number, restored: number, total: number, areas: string[] }> = {
     North: { active: 0, restored: 0, total: 0, areas: [] as string[] },
     East: { active: 0, restored: 0, total: 0, areas: [] as string[] },
@@ -806,7 +805,7 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
     'Sheger Region': { active: 0, restored: 0, total: 0, areas: [] as string[] },
   };
 
-  displayInterruptions.forEach((item) => {
+  displayInterruptions.filter(item => !isFeederRestored(item)).forEach((item) => {
     const dir = item.direction || getCardinalDirection(item.district, item.feederName);
     const isActive = item.status !== InterruptionStatus.RESTORED;
     
@@ -1044,7 +1043,6 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
             ) : (
               <div className="flex flex-wrap gap-2 max-h-[195px] overflow-y-auto pr-1 scrollbar-thin">
                 {filteredUniqueLocations.map((loc, idx) => {
-                  const isRestored = loc.status === InterruptionStatus.RESTORED;
                   const isUnderInvestigation = loc.status === InterruptionStatus.UNDER_INVESTIGATION;
                   const isActiveSelection = searchQuery.toLowerCase() === loc.name.toLowerCase() || searchQuery.toLowerCase() === loc.englishName.toLowerCase();
 
@@ -1061,8 +1059,6 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
                       className={`text-[11.5px] px-3 py-1.5 rounded-xl border flex items-center gap-2 transition-all text-left cursor-pointer ${
                         isActiveSelection 
                           ? 'bg-[#5FA354] border-[#5FA354] text-white font-bold ring-2 ring-[#5FA354]/40 shadow-sm'
-                          : isRestored
-                          ? 'bg-gray-100/50 dark:bg-gray-950/20 hover:bg-gray-100/50 border-gray-200 dark:border-gray-900 text-gray-400 dark:text-gray-600 line-through'
                           : isUnderInvestigation
                           ? 'bg-amber-500/5 hover:bg-amber-500/10 border-amber-300/40 text-amber-700 dark:text-amber-400 font-medium'
                           : 'bg-red-500/5 hover:bg-red-500/10 border-red-200/50 dark:border-red-950/40 text-red-600 dark:text-red-400 font-medium'
@@ -1071,15 +1067,11 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
                     >
                       {/* Live flashing status pulse marker */}
                       <span className="relative flex h-1.5 w-1.5 shrink-0">
-                        {!isRestored && !isUnderInvestigation && (
+                        {!isUnderInvestigation && (
                           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
                         )}
                         <span className={`relative inline-flex rounded-full h-1.5 w-1.5 ${
-                          isRestored 
-                            ? 'bg-gray-400' 
-                            : isUnderInvestigation
-                            ? 'bg-amber-400'
-                            : 'bg-red-500'
+                          isUnderInvestigation ? 'bg-amber-400' : 'bg-red-500'
                         }`} />
                       </span>
                       
@@ -1111,11 +1103,8 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
                 <span className="flex items-center gap-1.5 font-arial">
                   <span className="w-1.5 h-1.5 rounded-full bg-amber-400" /> Partially Connected
                 </span>
-                <span className="flex items-center gap-1.5 font-georgia">
-                  <span className="w-1.5 h-1.5 rounded-full bg-gray-400" /> Restored Location
-                </span>
               </div>
-              <span className="text-right font-arial">Click any area tag once to isolate; click again to clear search filters.</span>
+              <span className="text-right font-arial">Click any active area tag once to isolate; click again to clear search filters.</span>
             </div>
           </div>
         )}

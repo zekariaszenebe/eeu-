@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { History, ShieldCheck, CheckSquare, Search, Award, MapPin, Calendar, Compass, ShieldOff, Languages } from 'lucide-react';
-import { FeederInterruption, InterruptionStatus, stripBrackets } from '../types';
+import { History, ShieldCheck, CheckSquare, Search, Award, MapPin, Calendar, Compass, ShieldOff, Languages, Trash2 } from 'lucide-react';
+import { FeederInterruption, stripBrackets, isFeederRestored } from '../types';
 import { translateAmharicLocation } from '../utils/locationLanguage';
 import { InterruptionTypeBadge } from './AgentView';
+import { useInterruptions } from '../context/InterruptionContext';
 
 interface ResolutionArchiveProps {
   interruptions: FeederInterruption[];
@@ -10,10 +11,12 @@ interface ResolutionArchiveProps {
 
 export default function ResolutionArchive({ interruptions }: ResolutionArchiveProps) {
   const [query, setQuery] = useState('');
+  const { deleteInterruption, clearAllRestoredFeeders } = useInterruptions();
+  const [isClearing, setIsClearing] = useState(false);
   
-  // Filter for restored entries
+  // Filter for restored entries using robust status checking
   const restoredItems = interruptions.filter(item => {
-    if (item.status !== InterruptionStatus.RESTORED) return false;
+    if (!isFeederRestored(item)) return false;
     const q = query.toLowerCase();
     const englishArea = translateAmharicLocation(item.affectedArea).toLowerCase();
     return (
@@ -22,7 +25,18 @@ export default function ResolutionArchive({ interruptions }: ResolutionArchivePr
       englishArea.includes(q) ||
       item.remark.toLowerCase().includes(q)
     );
-  }).slice(0, 30);
+  }).slice(0, 50);
+
+  const handleClearAll = async () => {
+    if (window.confirm('Are you sure you want to permanently clear and purge all restored feeder records?')) {
+      setIsClearing(true);
+      try {
+        await clearAllRestoredFeeders();
+      } finally {
+        setIsClearing(false);
+      }
+    }
+  };
 
   return (
     <div id="resolution-archive-tab" className="space-y-6">
@@ -32,20 +46,40 @@ export default function ResolutionArchive({ interruptions }: ResolutionArchivePr
         <div className="space-y-1">
           <h3 className="font-display font-semibold text-base text-gray-900 dark:text-white flex items-center gap-2">
             <CheckSquare className="w-5 h-5 text-eeu-green" />
-            <span>Restored Feeders</span>
+            <span>Restored Feeders Archive</span>
+            <span className="text-xs bg-eeu-green/10 text-eeu-green px-2.5 py-0.5 rounded-full font-mono font-bold">
+              {restoredItems.length}
+            </span>
           </h3>
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            Feeders that have been restored to active power (live grid). Excluded from the live interruption board.
+          </p>
         </div>
 
-        <div className="relative min-w-[240px]">
-          <Search className="absolute left-3.5 top-3 w-4 h-4 text-gray-400" />
-          <input
-            id="archive-search"
-            type="text"
-            placeholder="Search by feeder or location (Amharic / English)..."
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 text-xs rounded-xl glass-input text-gray-900 dark:text-white focus:outline-none focus:ring-1.5 focus:ring-eeu-green"
-          />
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="relative min-w-[240px]">
+            <Search className="absolute left-3.5 top-3 w-4 h-4 text-gray-400" />
+            <input
+              id="archive-search"
+              type="text"
+              placeholder="Search by feeder or location (Amharic / English)..."
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 text-xs rounded-xl glass-input text-gray-900 dark:text-white focus:outline-none focus:ring-1.5 focus:ring-eeu-green"
+            />
+          </div>
+
+          {restoredItems.length > 0 && (
+            <button
+              onClick={handleClearAll}
+              disabled={isClearing}
+              className="px-3.5 py-2 text-xs font-semibold text-red-600 hover:text-red-700 bg-red-500/10 hover:bg-red-500/20 border border-red-200 dark:border-red-900/40 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              title="Permanently remove all restored feeder records"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>{isClearing ? 'Clearing...' : 'Clear All Restored'}</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -71,7 +105,16 @@ export default function ResolutionArchive({ interruptions }: ResolutionArchivePr
                   <span className="text-[10px] font-mono font-bold bg-eeu-green/10 text-eeu-green px-2 py-0.5 rounded-full uppercase">
                     RESOLVED & SUCCESSFUL
                   </span>
-                  <InterruptionTypeBadge type={item.type} />
+                  <div className="flex items-center gap-1.5">
+                    <InterruptionTypeBadge type={item.type} />
+                    <button
+                      onClick={() => deleteInterruption(item.id)}
+                      className="p-1 text-gray-400 hover:text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 transition-all cursor-pointer"
+                      title="Permanently delete this record"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
 
                 <h4 className="font-display font-semibold text-sm text-gray-900 dark:text-white leading-tight">
