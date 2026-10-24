@@ -179,38 +179,61 @@ export async function seedInitialDataIfEmpty() {
   }
 }
 
+function mergeOutages(remote: FeederInterruption[], local: FeederInterruption[]): FeederInterruption[] {
+  const map = new Map<string, FeederInterruption>();
+  const legacyMockIds = new Set(['f-1','f-2','f-3','f-4','f-5','f-6','f-7','f-8','f-9','f-10','f-11','f-12','f-13']);
+
+  for (const item of remote) {
+    if (item && item.id && !legacyMockIds.has(item.id) && !/^f-\d{1,2}$/.test(item.id)) {
+      map.set(item.id, item);
+    }
+  }
+  for (const item of local) {
+    if (item && item.id && !legacyMockIds.has(item.id) && !/^f-\d{1,2}$/.test(item.id)) {
+      if (!map.has(item.id)) {
+        map.set(item.id, item);
+      }
+    }
+  }
+
+  const list = Array.from(map.values());
+  return list.sort((a, b) => {
+    const aRestored = a.status === InterruptionStatus.RESTORED;
+    const bRestored = b.status === InterruptionStatus.RESTORED;
+    if (!aRestored && bRestored) return -1;
+    if (aRestored && !bRestored) return 1;
+    return (b.lastUpdated || '').localeCompare(a.lastUpdated || '');
+  });
+}
+
 /**
  * Subscribes to interruptions updates using the high-efficiency Single State Document pattern.
- * This reads exactly 1 document in Firestore regardless of how many outages exist (0, 5, 20, or 50).
- * 140 agent visits = ~140 reads total per day!
+ * Merges remote cloud data with local offline storage cache to prevent any data loss when closing PC or hitting quota.
  */
 export function subscribeToInterruptions(onUpdate: (items: FeederInterruption[]) => void, onlyActive: boolean = true) {
   try {
     const liveDocRef = doc(db, 'systemSettings', 'liveInterruptions');
     return onSnapshot(liveDocRef, (snap) => {
+      const localCached = getLocal<FeederInterruption[]>('eeu-interruptions', []);
+      let remoteList: FeederInterruption[] = [];
+
       if (snap.exists()) {
         const data = snap.data();
         if (Array.isArray(data.outages)) {
-          const list = data.outages as FeederInterruption[];
-          const sorted = [...list].sort((a, b) => {
-            const aRestored = a.status === InterruptionStatus.RESTORED;
-            const bRestored = b.status === InterruptionStatus.RESTORED;
-            if (!aRestored && bRestored) return -1;
-            if (aRestored && !bRestored) return 1;
-            return (b.lastUpdated || '').localeCompare(a.lastUpdated || '');
-          });
-          try {
-            localStorage.setItem('eeu-interruptions', JSON.stringify(sorted));
-          } catch {}
-          onUpdate(sorted);
-          return;
+          remoteList = data.outages as FeederInterruption[];
         }
       }
 
-      // If liveInterruptions doc doesn't exist yet, seed it once with local cache / empty data
-      const cached = getLocal<FeederInterruption[]>('eeu-interruptions', []).filter(item => item && !/^f-\d{1,2}$/.test(item.id));
-      onUpdate(cached);
-      setDoc(liveDocRef, { outages: cached, lastUpdated: new Date().toISOString() }).catch(() => {});
+      const merged = mergeOutages(remoteList, localCached);
+      try {
+        localStorage.setItem('eeu-interruptions', JSON.stringify(merged));
+      } catch {}
+      onUpdate(merged);
+
+      // If remote was empty or missing local items, backfill cloud document so other devices see them
+      if (!snap.exists() || (remoteList.length < merged.length && !isFirestoreQuotaExhausted())) {
+        setDoc(liveDocRef, { outages: merged, lastUpdated: new Date().toISOString() }, { merge: true }).catch(() => {});
+      }
     }, (err) => {
       handleFirestoreError(err, OperationType.GET, 'systemSettings/liveInterruptions');
       const cached = getLocal<FeederInterruption[]>('eeu-interruptions', []).filter(item => item && !/^f-\d{1,2}$/.test(item.id));
@@ -225,26 +248,25 @@ export function subscribeToInterruptions(onUpdate: (items: FeederInterruption[])
 
 /**
  * Direct fetch for the latest interruptions from Firestore.
- * Used for instant synchronization on tab focus and heartbeat polling.
+ * Merges remote cloud data with local offline storage cache.
  */
 export async function fetchLatestInterruptions(): Promise<FeederInterruption[]> {
   try {
     const liveDocRef = doc(db, 'systemSettings', 'liveInterruptions');
     const snap = await getDoc(liveDocRef);
+    const localCached = getLocal<FeederInterruption[]>('eeu-interruptions', []);
+    let remoteList: FeederInterruption[] = [];
+
     if (snap.exists()) {
       const data = snap.data();
       if (Array.isArray(data.outages)) {
-        const sorted = [...(data.outages as FeederInterruption[])].sort((a, b) => {
-          const aRestored = a.status === InterruptionStatus.RESTORED;
-          const bRestored = b.status === InterruptionStatus.RESTORED;
-          if (!aRestored && bRestored) return -1;
-          if (aRestored && !bRestored) return 1;
-          return (b.lastUpdated || '').localeCompare(a.lastUpdated || '');
-        });
-        setLocal('eeu-interruptions', sorted);
-        return sorted;
+        remoteList = data.outages as FeederInterruption[];
       }
     }
+
+    const merged = mergeOutages(remoteList, localCached);
+    setLocal('eeu-interruptions', merged);
+    return merged;
   } catch (err) {
     handleFirestoreError(err, OperationType.GET, 'systemSettings/liveInterruptions');
   }
