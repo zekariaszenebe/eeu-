@@ -9,7 +9,10 @@ import {
   fetchLatestInterruptions,
   cleanOutagesList,
   clearAllRestoredInterruptionsDoc,
-  recordDeletedInterruptionId
+  recordDeletedInterruptionId,
+  subscribeCloudStatus,
+  probeFirestoreConnection,
+  isFirestoreQuotaExhausted
 } from '../lib/firestoreService';
 
 interface InterruptionContextType {
@@ -22,6 +25,11 @@ interface InterruptionContextType {
   triggerToast: (title: string, desc: string, type?: 'info' | 'success' | 'warn') => void;
   liveToast: { title: string; desc: string; type: 'info' | 'success' | 'warn' } | null;
   setLiveToast: React.Dispatch<React.SetStateAction<{ title: string; desc: string; type: 'info' | 'success' | 'warn' } | null>>;
+  isCloudSyncActive: boolean;
+  isQuotaExhausted: boolean;
+  retryCloudSync: () => Promise<boolean>;
+  exportDataJson: () => string;
+  importDataJson: (jsonStr: string) => { success: boolean; count: number; message: string };
 }
 
 const InterruptionContext = createContext<InterruptionContextType | undefined>(undefined);
@@ -64,11 +72,36 @@ export const InterruptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }, 4500);
   };
 
-  // Broadcast channel message listener for instant cross-tab state syncing
+  const [cloudStatus, setCloudStatus] = useState<{ connected: boolean; quotaExhausted: boolean }>({
+    connected: !isFirestoreQuotaExhausted(),
+    quotaExhausted: isFirestoreQuotaExhausted()
+  });
+
+  useEffect(() => {
+    const unsub = subscribeCloudStatus((status) => {
+      setCloudStatus(status);
+    });
+    return unsub;
+  }, []);
+
+  // Tab Leader Election: Ensures only ONE active Firestore snapshot listener per workstation
+  // Follower tabs receive updates via BroadcastChannel (0 Firestore reads)
+  const [isLeaderTab, setIsLeaderTab] = useState<boolean>(() => {
+    return !channel; // If no BroadcastChannel, this tab acts as its own leader
+  });
+
+  const tabIdRef = React.useRef<string>(`tab_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`);
+  const lastLeaderHeartbeatRef = React.useRef<number>(0);
+  const currentLeaderIdRef = React.useRef<string | null>(null);
+
+  // Broadcast channel message listener for instant cross-tab state syncing & tab leader election
   useEffect(() => {
     if (!channel) return;
+    const myTabId = tabIdRef.current;
+
     const handleMessage = (event: MessageEvent) => {
       const { type, data } = event.data || {};
+
       if (type === 'DELETE_INTERRUPTION' && data && data.id) {
         recordDeletedInterruptionId(data.id);
         setInterruptions(prev => {
@@ -86,11 +119,90 @@ export const InterruptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
         } catch (e) {
           console.error('Failed to persist synced data to localStorage', e);
         }
+      } else if (type === 'LEADER_HEARTBEAT' && data && data.leaderId) {
+        lastLeaderHeartbeatRef.current = Date.now();
+        if (data.leaderId !== myTabId) {
+          if (currentLeaderIdRef.current !== data.leaderId) {
+            currentLeaderIdRef.current = data.leaderId;
+            setIsLeaderTab(false);
+          }
+        }
+      } else if (type === 'PING_LEADER') {
+        if (currentLeaderIdRef.current === myTabId) {
+          channel.postMessage({
+            type: 'LEADER_HEARTBEAT',
+            data: { leaderId: myTabId, timestamp: Date.now() }
+          });
+        }
+      } else if (type === 'LEADER_RESIGN') {
+        if (currentLeaderIdRef.current === data?.leaderId) {
+          // The previous leader tab was closed; claim leadership immediately
+          currentLeaderIdRef.current = myTabId;
+          lastLeaderHeartbeatRef.current = Date.now();
+          setIsLeaderTab(true);
+          channel.postMessage({
+            type: 'LEADER_HEARTBEAT',
+            data: { leaderId: myTabId, timestamp: Date.now() }
+          });
+        }
       }
     };
+
     channel.addEventListener('message', handleMessage);
+
+    // Announce presence and query if an existing leader tab is running
+    channel.postMessage({ type: 'PING_LEADER', data: { tabId: myTabId } });
+
+    // Periodic heartbeat loop
+    const heartbeatInterval = setInterval(() => {
+      if (currentLeaderIdRef.current === myTabId) {
+        channel.postMessage({
+          type: 'LEADER_HEARTBEAT',
+          data: { leaderId: myTabId, timestamp: Date.now() }
+        });
+      } else {
+        // Follower tab: if no heartbeat received for > 5 seconds, take over
+        const elapsed = Date.now() - lastLeaderHeartbeatRef.current;
+        if (lastLeaderHeartbeatRef.current > 0 && elapsed > 5000) {
+          currentLeaderIdRef.current = myTabId;
+          lastLeaderHeartbeatRef.current = Date.now();
+          setIsLeaderTab(true);
+          channel.postMessage({
+            type: 'LEADER_HEARTBEAT',
+            data: { leaderId: myTabId, timestamp: Date.now() }
+          });
+        }
+      }
+    }, 2000);
+
+    // Initial election delay: If no heartbeat arrives within 400ms after mount, claim leadership
+    const initialElectionTimeout = setTimeout(() => {
+      if (!currentLeaderIdRef.current || currentLeaderIdRef.current === myTabId) {
+        currentLeaderIdRef.current = myTabId;
+        lastLeaderHeartbeatRef.current = Date.now();
+        setIsLeaderTab(true);
+        channel.postMessage({
+          type: 'LEADER_HEARTBEAT',
+          data: { leaderId: myTabId, timestamp: Date.now() }
+        });
+      }
+    }, 400);
+
+    const handleBeforeUnload = () => {
+      if (currentLeaderIdRef.current === myTabId) {
+        channel.postMessage({ type: 'LEADER_RESIGN', data: { leaderId: myTabId } });
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
     return () => {
+      clearInterval(heartbeatInterval);
+      clearTimeout(initialElectionTimeout);
       channel.removeEventListener('message', handleMessage);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      if (currentLeaderIdRef.current === myTabId) {
+        channel.postMessage({ type: 'LEADER_RESIGN', data: { leaderId: myTabId } });
+      }
     };
   }, []);
 
@@ -114,9 +226,15 @@ export const InterruptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     };
   }, []);
 
-  // Continuous real-time subscription to Firestore live interruptions + Instant focus & interval sync
+  // Continuous real-time subscription to Firestore live interruptions
+  // CRITICAL READ OPTIMIZATION:
+  // Only the elected Leader Tab opens this Firestore snapshot listener!
+  // Sibling tabs on the same computer receive updates via BroadcastChannel (0 Firestore reads).
   useEffect(() => {
-    // 1. Primary real-time onSnapshot listener
+    if (!isLeaderTab) {
+      return;
+    }
+
     const unsub = subscribeToInterruptions((items) => {
       setInterruptions(prev => {
         const serializedPrev = JSON.stringify(prev);
@@ -133,46 +251,10 @@ export const InterruptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
       });
     });
 
-    // 2. Cooldown-throttled sync when window/tab is focused or becomes visible (e.g. after computer sleep)
-    let lastFocusSyncTime = 0;
-    const handleSync = async () => {
-      const now = Date.now();
-      // Enforce at least 60 seconds between manual focus checks to avoid burning reads
-      if (now - lastFocusSyncTime < 60000) return;
-      lastFocusSyncTime = now;
-
-      try {
-        const latest = await fetchLatestInterruptions();
-        setInterruptions(prev => {
-          const serializedPrev = JSON.stringify(prev);
-          const serializedNext = JSON.stringify(latest);
-          if (serializedPrev === serializedNext) return prev;
-          try {
-            localStorage.setItem('eeu-interruptions', serializedNext);
-          } catch {}
-          channel?.postMessage({ type: 'SYNC_INTERRUPTIONS', data: latest });
-          return latest;
-        });
-      } catch (err) {
-        console.error('Focus sync error:', err);
-      }
-    };
-
-    const handleVisibility = () => {
-      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
-        handleSync();
-      }
-    };
-
-    window.addEventListener('focus', handleSync);
-    document.addEventListener('visibilitychange', handleVisibility);
-
     return () => {
       unsub();
-      window.removeEventListener('focus', handleSync);
-      document.removeEventListener('visibilitychange', handleVisibility);
     };
-  }, []);
+  }, [isLeaderTab]);
 
   // Keep active local state clean and bounded
   useEffect(() => {
@@ -191,7 +273,7 @@ export const InterruptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }
   }, [interruptions]);
 
-  // Create interruption with local persistence fallback
+  // Create interruption with local persistence & truthful sync feedback
   const addInterruption = async (entry: Omit<FeederInterruption, 'id' | 'lastUpdated'>) => {
     const tempId = `f-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
     const timestampStr = new Date().toLocaleString('en-US', {
@@ -226,21 +308,25 @@ export const InterruptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     });
 
     try {
-      await addInterruptionDoc(entry, tempId);
-      triggerToast('New Outage Added', `${entry.feederName} has been synchronized across agent terminals`, 'warn');
+      const result = await addInterruptionDoc(entry, tempId);
+      if (result.syncedToCloud) {
+        triggerToast('New Outage Added & Synced', `${entry.feederName} synchronized across all call center terminals`, 'success');
+      } else if (result.quotaExhausted) {
+        triggerToast('Saved in Local Browser Only', `${entry.feederName} stored locally. Firebase free tier daily quota is currently reached, so other terminals cannot pull it yet.`, 'warn');
+      } else {
+        triggerToast('Saved Locally (Offline)', `${entry.feederName} saved on this machine. Waiting for cloud connection.`, 'info');
+      }
     } catch (e) {
       console.error('Firestore addInterruptionDoc failed, using local offline fallback:', e);
-      triggerToast('Saved Offline', `${entry.feederName} saved locally. Will sync with backend when network is restored.`, 'info');
+      triggerToast('Saved Locally', `${entry.feederName} saved in your browser.`, 'info');
     }
   };
 
-  // Update interruption with local persistence fallback
+  // Update interruption with local persistence & quota-aware feedback
   const updateInterruption = async (id: string, entry: Partial<FeederInterruption>) => {
     let existing: FeederInterruption | undefined;
-    let backupList: FeederInterruption[] = [];
 
     setInterruptions(prev => {
-      backupList = prev;
       existing = prev.find(item => item.id === id);
       if (!existing) return prev;
 
@@ -270,7 +356,7 @@ export const InterruptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
     if (!existing) return;
 
-    // Instant zero-latency UI toast feedback
+    // Zero-latency UI toast feedback
     if (entry.status && entry.status !== existing.status) {
       const titleText = entry.status === InterruptionStatus.RESTORED ? 'Feeder Line Cleared' : 'Operational Status Changed';
       const messageText = entry.status === InterruptionStatus.RESTORED 
@@ -282,7 +368,10 @@ export const InterruptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }
 
     try {
-      await updateInterruptionDoc(id, entry, existing);
+      const res = await updateInterruptionDoc(id, entry, existing);
+      if (res && res.quotaExhausted) {
+        triggerToast('Saved Locally (Quota Reached)', `${existing.feederName} updated locally. Firebase cloud quota limit reached.`, 'warn');
+      }
     } catch (e) {
       console.error('Firestore updateInterruptionDoc failed, using local offline fallback:', e);
     }
@@ -305,9 +394,13 @@ export const InterruptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     });
 
     try {
-      await deleteInterruptionDoc(id);
+      const res = await deleteInterruptionDoc(id);
       if (target) {
-        triggerToast('Record Removed', `${target.feederName} interruption permanently cleared.`, 'info');
+        if (res && res.quotaExhausted) {
+          triggerToast('Deleted Locally (Quota Reached)', `${target.feederName} cleared locally. Firebase cloud quota limit reached.`, 'warn');
+        } else {
+          triggerToast('Record Removed', `${target.feederName} interruption permanently cleared.`, 'info');
+        }
       }
     } catch (e) {
       console.error('Firestore deleteInterruptionDoc failed, keeping deletion locally:', e);
@@ -320,7 +413,8 @@ export const InterruptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
   // Permanently clear all restored feeders from active lists & database
   const clearAllRestoredFeeders = async () => {
     try {
-      const count = await clearAllRestoredInterruptionsDoc();
+      const res = await clearAllRestoredInterruptionsDoc();
+      const count = typeof res === 'object' ? res.count : res;
       setInterruptions(prev => {
         const nextList = prev.filter(i => !isFeederRestored(i));
         try {
@@ -329,10 +423,51 @@ export const InterruptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
         channel?.postMessage({ type: 'SYNC_INTERRUPTIONS', data: nextList });
         return nextList;
       });
-      triggerToast('Restored Records Cleared', `Successfully purged ${count} restored feeders. Grid is clean and live.`, 'success');
+      if (res && typeof res === 'object' && res.quotaExhausted) {
+        triggerToast('Restored Records Cleared Locally', `Purged ${count} restored feeders locally. (Firebase cloud quota reached)`, 'info');
+      } else {
+        triggerToast('Restored Records Cleared', `Successfully purged ${count} restored feeders. Grid is clean and live.`, 'success');
+      }
     } catch (e) {
       console.error('Failed to clear restored feeders:', e);
       triggerToast('Clear Failed', 'Could not clear restored feeder records.', 'warn');
+    }
+  };
+
+  const retryCloudSync = async (): Promise<boolean> => {
+    const res = await probeFirestoreConnection();
+    if (res.connected) {
+      triggerToast('Cloud Sync Connected', 'Successfully reconnected to Firebase Firestore backend!', 'success');
+      return true;
+    } else if (res.quotaExhausted) {
+      triggerToast('Quota Still Exhausted', 'Firebase free tier daily read/write limit is still active. Quota resets daily at midnight PST.', 'warn');
+      return false;
+    } else {
+      triggerToast('Reconnection Failed', 'Could not reach Firebase Firestore. Operating in local mode.', 'warn');
+      return false;
+    }
+  };
+
+  const exportDataJson = () => {
+    return JSON.stringify(interruptions, null, 2);
+  };
+
+  const importDataJson = (jsonStr: string): { success: boolean; count: number; message: string } => {
+    try {
+      const parsed = JSON.parse(jsonStr);
+      if (!Array.isArray(parsed)) {
+        return { success: false, count: 0, message: 'Invalid data format: expected an array of interruptions.' };
+      }
+      const cleaned = cleanOutagesList(parsed);
+      setInterruptions(cleaned);
+      try {
+        localStorage.setItem('eeu-interruptions', JSON.stringify(cleaned));
+      } catch {}
+      channel?.postMessage({ type: 'SYNC_INTERRUPTIONS', data: cleaned });
+      triggerToast('Data Imported', `Successfully loaded ${cleaned.length} interruption records!`, 'success');
+      return { success: true, count: cleaned.length, message: `Imported ${cleaned.length} records successfully.` };
+    } catch (e) {
+      return { success: false, count: 0, message: 'Failed to parse JSON: ' + (e instanceof Error ? e.message : String(e)) };
     }
   };
 
@@ -346,7 +481,12 @@ export const InterruptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
       clearAllRestoredFeeders,
       triggerToast,
       liveToast,
-      setLiveToast
+      setLiveToast,
+      isCloudSyncActive: cloudStatus.connected && !cloudStatus.quotaExhausted,
+      isQuotaExhausted: cloudStatus.quotaExhausted,
+      retryCloudSync,
+      exportDataJson,
+      importDataJson
     }}>
       {children}
     </InterruptionContext.Provider>

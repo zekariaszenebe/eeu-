@@ -59,6 +59,41 @@ export function setFirestoreQuotaExhausted() {
   quotaExhausted = true;
 }
 
+type CloudStatusListener = (status: { connected: boolean; quotaExhausted: boolean }) => void;
+const cloudStatusListeners = new Set<CloudStatusListener>();
+
+export function subscribeCloudStatus(listener: CloudStatusListener) {
+  cloudStatusListeners.add(listener);
+  listener({ connected: !quotaExhausted, quotaExhausted });
+  return () => {
+    cloudStatusListeners.delete(listener);
+  };
+}
+
+export function notifyCloudStatus(connected: boolean, isQuota: boolean) {
+  if (isQuota) quotaExhausted = true;
+  cloudStatusListeners.forEach(fn => fn({ connected, quotaExhausted: isQuota }));
+}
+
+export async function probeFirestoreConnection(): Promise<{ connected: boolean; quotaExhausted: boolean }> {
+  try {
+    const liveDocRef = doc(db, 'systemSettings', 'liveInterruptions');
+    await getDoc(liveDocRef);
+    quotaExhausted = false;
+    notifyCloudStatus(true, false);
+    return { connected: true, quotaExhausted: false };
+  } catch (err) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    const errCode = (err as { code?: string })?.code;
+    const isQuota = errCode === 'resource-exhausted' || errMsg.includes('Quota exceeded') || errMsg.includes('resource-exhausted');
+    if (isQuota) {
+      quotaExhausted = true;
+    }
+    notifyCloudStatus(!isQuota, isQuota);
+    return { connected: false, quotaExhausted: isQuota };
+  }
+}
+
 function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null): void {
   const errMsg = error instanceof Error ? error.message : String(error);
   const errCode = (error as { code?: string })?.code;
@@ -66,29 +101,24 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
   if (
     errCode === 'resource-exhausted' || 
     errMsg.includes('Quota limit exceeded') || 
+    errMsg.includes('Quota exceeded') || 
     errMsg.includes('resource-exhausted') ||
     errMsg.includes('Free daily write units')
   ) {
     setFirestoreQuotaExhausted();
-    console.info(`Firestore operating seamlessly via local persistent storage (quota notice for ${path || 'database'}).`);
+    notifyCloudStatus(false, true);
+    console.info(`Firestore operating in local persistent storage mode (free tier daily quota reached for ${path || 'database'}).`);
     return;
   }
 
   if (errCode === 'unavailable' || errMsg.includes('the client is offline') || errMsg.includes('unavailable')) {
+    notifyCloudStatus(false, false);
     console.info(`Firestore [${operationType}] for path '${path}' operating in local offline cache mode.`);
     return;
   }
 
   console.info(`Firestore note [${operationType}] for path '${path}':`, errMsg);
 }
-
-// Firestore collection references
-const interruptionsCol = collection(db, 'interruptions');
-const presetFeedersCol = collection(db, 'presetFeeders');
-const hubRecordsCol = collection(db, 'hubRecords');
-const teamLeaderNotesCol = collection(db, 'teamLeaderNotes');
-const customerContactsCol = collection(db, 'customerContacts');
-const teamLeadersCol = collection(db, 'teamLeaders');
 
 // Local storage persistent fallback helpers
 function getLocal<T>(key: string, fallback: T): T {
@@ -251,6 +281,7 @@ export function subscribeToInterruptions(onUpdate: (items: FeederInterruption[])
         }
       }
 
+      notifyCloudStatus(true, false);
       setLocal('eeu-interruptions', outages);
       onUpdate(outages);
     }, (err) => {
@@ -352,10 +383,16 @@ function sanitizeInterruptionDoc(item: FeederInterruption): Record<string, any> 
   };
 }
 
+export interface InterruptionMutationResult {
+  record: FeederInterruption;
+  syncedToCloud: boolean;
+  quotaExhausted: boolean;
+}
+
 /**
- * Creates a new interruption and a companion notification.
+ * Creates a new interruption and updates Firestore/local storage.
  */
-export async function addInterruptionDoc(entry: Omit<FeederInterruption, 'id' | 'lastUpdated'>, customId?: string) {
+export async function addInterruptionDoc(entry: Omit<FeederInterruption, 'id' | 'lastUpdated'>, customId?: string): Promise<InterruptionMutationResult> {
   const suffix = Math.random().toString(36).substring(2, 9);
   const newId = customId || `f-${Date.now()}-${suffix}`;
   const timestampStr = new Date().toLocaleString('en-US', {
@@ -387,23 +424,25 @@ export async function addInterruptionDoc(entry: Omit<FeederInterruption, 'id' | 
   const updatedList = [record, ...localList.filter(i => i.id !== newId)];
   setLocal('eeu-interruptions', updatedList);
 
-  if (!isFirestoreQuotaExhausted()) {
-    try {
-      const liveDocRef = doc(db, 'systemSettings', 'liveInterruptions');
-      await setDoc(liveDocRef, { outages: updatedList, lastUpdated: timestampStr });
-      await setDoc(doc(db, 'interruptions', newId), record);
-    } catch (error) {
-      handleFirestoreError(error, OperationType.CREATE, `systemSettings/liveInterruptions`);
-    }
+  if (isFirestoreQuotaExhausted()) {
+    return { record, syncedToCloud: false, quotaExhausted: true };
   }
 
-  return record;
+  try {
+    const liveDocRef = doc(db, 'systemSettings', 'liveInterruptions');
+    await setDoc(liveDocRef, { outages: updatedList, lastUpdated: timestampStr });
+    notifyCloudStatus(true, false);
+    return { record, syncedToCloud: true, quotaExhausted: false };
+  } catch (error) {
+    handleFirestoreError(error, OperationType.CREATE, `systemSettings/liveInterruptions`);
+    return { record, syncedToCloud: false, quotaExhausted: isFirestoreQuotaExhausted() };
+  }
 }
 
 /**
  * Updates an interruption and conditionally adds a progress notification.
  */
-export async function updateInterruptionDoc(id: string, entry: Partial<FeederInterruption>, existingRecord?: FeederInterruption) {
+export async function updateInterruptionDoc(id: string, entry: Partial<FeederInterruption>, existingRecord?: FeederInterruption): Promise<InterruptionMutationResult> {
   const timestampStr = new Date().toLocaleString('en-US', {
     month: 'short',
     day: 'numeric',
@@ -447,41 +486,49 @@ export async function updateInterruptionDoc(id: string, entry: Partial<FeederInt
   const updatedList = localList.map(i => i.id === id ? merged : i);
   setLocal('eeu-interruptions', updatedList);
   
-  if (!isFirestoreQuotaExhausted()) {
-    try {
-      const liveDocRef = doc(db, 'systemSettings', 'liveInterruptions');
-      await setDoc(liveDocRef, { outages: updatedList, lastUpdated: timestampStr });
-      await setDoc(doc(db, 'interruptions', id), merged);
-    } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, `systemSettings/liveInterruptions`);
-    }
+  if (isFirestoreQuotaExhausted()) {
+    return { record: merged, syncedToCloud: false, quotaExhausted: true };
+  }
+
+  try {
+    const liveDocRef = doc(db, 'systemSettings', 'liveInterruptions');
+    await setDoc(liveDocRef, { outages: updatedList, lastUpdated: timestampStr });
+    notifyCloudStatus(true, false);
+    return { record: merged, syncedToCloud: true, quotaExhausted: false };
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, `systemSettings/liveInterruptions`);
+    return { record: merged, syncedToCloud: false, quotaExhausted: isFirestoreQuotaExhausted() };
   }
 }
 
 /**
  * Deletes an interruption and records its ID tombstone so it never resurrects.
  */
-export async function deleteInterruptionDoc(id: string) {
+export async function deleteInterruptionDoc(id: string): Promise<{ syncedToCloud: boolean; quotaExhausted: boolean }> {
   recordDeletedInterruptionId(id);
   const localList = cleanOutagesList(getLocal<FeederInterruption[]>('eeu-interruptions', []));
   const updatedList = localList.filter(i => i.id !== id);
   setLocal('eeu-interruptions', updatedList);
 
-  if (!isFirestoreQuotaExhausted()) {
-    try {
-      const liveDocRef = doc(db, 'systemSettings', 'liveInterruptions');
-      await setDoc(liveDocRef, { outages: updatedList, lastUpdated: new Date().toISOString() });
-      await deleteDoc(doc(db, 'interruptions', id));
-    } catch (error) {
-      handleFirestoreError(error, OperationType.DELETE, `systemSettings/liveInterruptions`);
-    }
+  if (isFirestoreQuotaExhausted()) {
+    return { syncedToCloud: false, quotaExhausted: true };
+  }
+
+  try {
+    const liveDocRef = doc(db, 'systemSettings', 'liveInterruptions');
+    await setDoc(liveDocRef, { outages: updatedList, lastUpdated: new Date().toISOString() });
+    notifyCloudStatus(true, false);
+    return { syncedToCloud: true, quotaExhausted: false };
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, `systemSettings/liveInterruptions`);
+    return { syncedToCloud: false, quotaExhausted: isFirestoreQuotaExhausted() };
   }
 }
 
 /**
  * Permanently deletes all restored feeder records from both Firestore and local storage.
  */
-export async function clearAllRestoredInterruptionsDoc(): Promise<number> {
+export async function clearAllRestoredInterruptionsDoc(): Promise<{ count: number; syncedToCloud: boolean; quotaExhausted: boolean }> {
   const localList = cleanOutagesList(getLocal<FeederInterruption[]>('eeu-interruptions', []));
   const restoredItems = localList.filter(i => isFeederRestored(i));
   restoredItems.forEach(i => recordDeletedInterruptionId(i.id));
@@ -489,19 +536,19 @@ export async function clearAllRestoredInterruptionsDoc(): Promise<number> {
   const activeOnly = localList.filter(i => !isFeederRestored(i));
   setLocal('eeu-interruptions', activeOnly);
 
-  if (!isFirestoreQuotaExhausted()) {
-    try {
-      const liveDocRef = doc(db, 'systemSettings', 'liveInterruptions');
-      await setDoc(liveDocRef, { outages: activeOnly, lastUpdated: new Date().toISOString() });
-      for (const item of restoredItems) {
-        deleteDoc(doc(db, 'interruptions', item.id)).catch(() => {});
-      }
-    } catch (error) {
-      handleFirestoreError(error, OperationType.DELETE, `systemSettings/liveInterruptions`);
-    }
+  if (isFirestoreQuotaExhausted()) {
+    return { count: restoredItems.length, syncedToCloud: false, quotaExhausted: true };
   }
 
-  return restoredItems.length;
+  try {
+    const liveDocRef = doc(db, 'systemSettings', 'liveInterruptions');
+    await setDoc(liveDocRef, { outages: activeOnly, lastUpdated: new Date().toISOString() });
+    notifyCloudStatus(true, false);
+    return { count: restoredItems.length, syncedToCloud: true, quotaExhausted: false };
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, `systemSettings/liveInterruptions`);
+    return { count: restoredItems.length, syncedToCloud: false, quotaExhausted: isFirestoreQuotaExhausted() };
+  }
 }
 
 /**
@@ -653,31 +700,33 @@ export async function updateHubRecordDoc(record: HubRecord) {
 /**
  * Subscribes to TeamLeaderNotes in real-time.
  */
+/**
+ * Subscribes to TeamLeaderNotes in real-time using Single State Document.
+ * Reduces reads from N documents down to 1 single document.
+ */
 export function subscribeToTeamLeaderNotes(onUpdate: (items: TeamLeaderNote[]) => void) {
   try {
-    return onSnapshot(teamLeaderNotesCol, (snapshot) => {
-      const list: TeamLeaderNote[] = [];
-      snapshot.forEach((doc) => {
-        const data = doc.data();
-        list.push({
-          id: data.id || doc.id,
-          content: data.content,
-          author: data.author,
-          timestamp: data.timestamp,
-          isUrgent: data.isUrgent
-        } as TeamLeaderNote);
-      });
+    const configDocRef = doc(db, 'systemSettings', 'teamLeaderNotes');
+    return onSnapshot(configDocRef, (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        if (Array.isArray(data.list)) {
+          const list = data.list as TeamLeaderNote[];
+          const sorted = [...list].sort((a, b) => {
+            if (a.isUrgent && !b.isUrgent) return -1;
+            if (!a.isUrgent && b.isUrgent) return 1;
+            return (b.timestamp || '').localeCompare(a.timestamp || '');
+          });
+          setLocal('eeu-team-leader-notes', sorted);
+          onUpdate(sorted);
+          return;
+        }
+      }
 
-      const sorted = [...list].sort((a, b) => {
-        if (a.isUrgent && !b.isUrgent) return -1;
-        if (!a.isUrgent && b.isUrgent) return 1;
-        return (b.timestamp || '').localeCompare(a.timestamp || '');
-      });
-
-      setLocal('eeu-team-leader-notes', sorted);
-      onUpdate(sorted);
+      const cached = getLocal<TeamLeaderNote[]>('eeu-team-leader-notes', []);
+      onUpdate(cached);
     }, (err) => {
-      handleFirestoreError(err, OperationType.GET, 'teamLeaderNotes');
+      handleFirestoreError(err, OperationType.GET, 'systemSettings/teamLeaderNotes');
       const cached = getLocal<TeamLeaderNote[]>('eeu-team-leader-notes', []);
       onUpdate(cached);
     });
@@ -710,13 +759,15 @@ export async function addTeamLeaderNoteDoc(content: string, author: string, isUr
   };
 
   const localNotes = getLocal<TeamLeaderNote[]>('eeu-team-leader-notes', []);
-  setLocal('eeu-team-leader-notes', [record, ...localNotes]);
+  const updatedList = [record, ...localNotes];
+  setLocal('eeu-team-leader-notes', updatedList);
 
   if (!isFirestoreQuotaExhausted()) {
     try {
-      await setDoc(doc(db, 'teamLeaderNotes', cleanId), record);
+      const configDocRef = doc(db, 'systemSettings', 'teamLeaderNotes');
+      await setDoc(configDocRef, { list: updatedList, lastUpdated: timestampStr });
     } catch (error) {
-      handleFirestoreError(error, OperationType.CREATE, `teamLeaderNotes/${cleanId}`);
+      handleFirestoreError(error, OperationType.CREATE, `systemSettings/teamLeaderNotes`);
     }
   }
 
@@ -736,17 +787,15 @@ export async function updateTeamLeaderNoteDoc(id: string, content: string, isUrg
   });
 
   const localNotes = getLocal<TeamLeaderNote[]>('eeu-team-leader-notes', []);
-  setLocal('eeu-team-leader-notes', localNotes.map(n => n.id === id ? { ...n, content, isUrgent, timestamp: timestampStr } : n));
+  const updatedList = localNotes.map(n => n.id === id ? { ...n, content, isUrgent, timestamp: timestampStr } : n);
+  setLocal('eeu-team-leader-notes', updatedList);
 
   if (!isFirestoreQuotaExhausted()) {
     try {
-      await updateDoc(doc(db, 'teamLeaderNotes', id), { 
-        content, 
-        isUrgent,
-        timestamp: timestampStr 
-      });
+      const configDocRef = doc(db, 'systemSettings', 'teamLeaderNotes');
+      await setDoc(configDocRef, { list: updatedList, lastUpdated: timestampStr });
     } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, `teamLeaderNotes/${id}`);
+      handleFirestoreError(error, OperationType.UPDATE, `systemSettings/teamLeaderNotes`);
     }
   }
 }
@@ -756,13 +805,15 @@ export async function updateTeamLeaderNoteDoc(id: string, content: string, isUrg
  */
 export async function deleteTeamLeaderNoteDoc(id: string) {
   const localNotes = getLocal<TeamLeaderNote[]>('eeu-team-leader-notes', []);
-  setLocal('eeu-team-leader-notes', localNotes.filter(n => n.id !== id));
+  const updatedList = localNotes.filter(n => n.id !== id);
+  setLocal('eeu-team-leader-notes', updatedList);
 
   if (!isFirestoreQuotaExhausted()) {
     try {
-      await deleteDoc(doc(db, 'teamLeaderNotes', id));
+      const configDocRef = doc(db, 'systemSettings', 'teamLeaderNotes');
+      await setDoc(configDocRef, { list: updatedList, lastUpdated: new Date().toISOString() });
     } catch (error) {
-      handleFirestoreError(error, OperationType.DELETE, `teamLeaderNotes/${id}`);
+      handleFirestoreError(error, OperationType.DELETE, `systemSettings/teamLeaderNotes`);
     }
   }
 }
@@ -773,16 +824,13 @@ export async function deleteTeamLeaderNoteDoc(id: string) {
 export async function clearTeamLeaderNotes() {
   setLocal('eeu-team-leader-notes', []);
 
-
-  try {
-    const snap = await getDocs(teamLeaderNotesCol);
-    const batch = writeBatch(db);
-    snap.forEach((doc) => {
-      batch.delete(doc.ref);
-    });
-    await batch.commit();
-  } catch (error) {
-    handleFirestoreError(error, OperationType.DELETE, 'teamLeaderNotes');
+  if (!isFirestoreQuotaExhausted()) {
+    try {
+      const configDocRef = doc(db, 'systemSettings', 'teamLeaderNotes');
+      await setDoc(configDocRef, { list: [], lastUpdated: new Date().toISOString() });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `systemSettings/teamLeaderNotes`);
+    }
   }
 }
 
@@ -932,26 +980,25 @@ export function subscribeToTeamLeaders(onUpdate: (items: TeamLeaderUser[]) => vo
   ];
 
   try {
-    return onSnapshot(teamLeadersCol, (snapshot) => {
-      const list: TeamLeaderUser[] = [];
-      snapshot.forEach((doc) => {
-        const data = doc.data();
-        list.push({
-          id: data.id || doc.id,
-          username: data.username,
-          password: data.password,
-          name: data.name,
-          district: data.district,
-          mustChangePassword: data.mustChangePassword,
-          createdAt: data.createdAt || new Date().toISOString()
-        } as TeamLeaderUser);
-      });
+    const configDocRef = doc(db, 'systemSettings', 'teamLeaders');
+    return onSnapshot(configDocRef, (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        if (Array.isArray(data.list) && data.list.length > 0) {
+          const list = data.list as TeamLeaderUser[];
+          list.sort((a, b) => a.name.localeCompare(b.name));
+          setLocal('eeu-team-leaders', list);
+          onUpdate(list);
+          return;
+        }
+      }
 
-      list.sort((a, b) => a.name.localeCompare(b.name));
-      setLocal('eeu-team-leaders', list);
-      onUpdate(list);
+      // Seed once if document doesn't exist
+      const localCached = getLocal<TeamLeaderUser[]>('eeu-team-leaders', defaultLeaders);
+      onUpdate(localCached);
+      setDoc(configDocRef, { list: localCached }).catch(() => {});
     }, (err) => {
-      handleFirestoreError(err, OperationType.GET, 'teamLeaders');
+      handleFirestoreError(err, OperationType.GET, 'systemSettings/teamLeaders');
       const cached = getLocal<TeamLeaderUser[]>('eeu-team-leaders', defaultLeaders);
       onUpdate(cached);
     });
@@ -969,28 +1016,30 @@ export async function addTeamLeaderDoc(item: Omit<TeamLeaderUser, 'id' | 'create
   const newId = `tl-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
   const cleanUsername = item.username.trim();
 
-  const record: Record<string, any> = {
+  const record: TeamLeaderUser = {
     id: newId,
     username: cleanUsername,
     password: item.password.trim(),
     name: item.name.trim(),
-    createdAt: new Date().toISOString()
+    createdAt: new Date().toISOString(),
+    ...(item.district ? { district: item.district } : {}),
+    ...(typeof item.mustChangePassword === 'boolean' ? { mustChangePassword: item.mustChangePassword } : {})
   };
-  if (item.district) record.district = item.district;
-  if (typeof item.mustChangePassword === 'boolean') record.mustChangePassword = item.mustChangePassword;
 
   const localLeaders = getLocal<TeamLeaderUser[]>('eeu-team-leaders', []);
-  setLocal('eeu-team-leaders', [...localLeaders, record as TeamLeaderUser]);
+  const updated = [...localLeaders, record];
+  setLocal('eeu-team-leaders', updated);
 
   if (!isFirestoreQuotaExhausted()) {
     try {
-      await setDoc(doc(db, 'teamLeaders', newId), record);
+      const configDocRef = doc(db, 'systemSettings', 'teamLeaders');
+      await setDoc(configDocRef, { list: updated }, { merge: true });
     } catch (error) {
-      handleFirestoreError(error, OperationType.CREATE, `teamLeaders/${newId}`);
+      handleFirestoreError(error, OperationType.CREATE, `systemSettings/teamLeaders`);
     }
   }
 
-  return record as TeamLeaderUser;
+  return record;
 }
 
 /**
@@ -998,24 +1047,24 @@ export async function addTeamLeaderDoc(item: Omit<TeamLeaderUser, 'id' | 'create
  */
 export async function updateTeamLeaderDoc(item: TeamLeaderUser) {
   const cleanUsername = item.username.trim();
-  const record: Record<string, any> = {
-    id: item.id,
+  const record: TeamLeaderUser = {
+    ...item,
     username: cleanUsername,
     password: item.password.trim(),
     name: item.name.trim(),
     createdAt: item.createdAt || new Date().toISOString()
   };
-  if (item.district) record.district = item.district;
-  if (typeof item.mustChangePassword === 'boolean') record.mustChangePassword = item.mustChangePassword;
 
   const localLeaders = getLocal<TeamLeaderUser[]>('eeu-team-leaders', []);
-  setLocal('eeu-team-leaders', localLeaders.map(tl => tl.id === item.id ? { ...tl, ...record } : tl));
+  const updated = localLeaders.map(tl => tl.id === item.id ? { ...tl, ...record } : tl);
+  setLocal('eeu-team-leaders', updated);
 
   if (!isFirestoreQuotaExhausted()) {
     try {
-      await setDoc(doc(db, 'teamLeaders', item.id), record);
+      const configDocRef = doc(db, 'systemSettings', 'teamLeaders');
+      await setDoc(configDocRef, { list: updated }, { merge: true });
     } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, `teamLeaders/${item.id}`);
+      handleFirestoreError(error, OperationType.UPDATE, `systemSettings/teamLeaders`);
     }
   }
 }
@@ -1025,13 +1074,15 @@ export async function updateTeamLeaderDoc(item: TeamLeaderUser) {
  */
 export async function deleteTeamLeaderDoc(id: string) {
   const localLeaders = getLocal<TeamLeaderUser[]>('eeu-team-leaders', []);
-  setLocal('eeu-team-leaders', localLeaders.filter(tl => tl.id !== id));
+  const updated = localLeaders.filter(tl => tl.id !== id);
+  setLocal('eeu-team-leaders', updated);
 
   if (!isFirestoreQuotaExhausted()) {
     try {
-      await deleteDoc(doc(db, 'teamLeaders', id));
+      const configDocRef = doc(db, 'systemSettings', 'teamLeaders');
+      await setDoc(configDocRef, { list: updated }, { merge: true });
     } catch (error) {
-      handleFirestoreError(error, OperationType.DELETE, `teamLeaders/${id}`);
+      handleFirestoreError(error, OperationType.DELETE, `systemSettings/teamLeaders`);
     }
   }
 }

@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { 
   Zap, Menu, X, ShieldAlert, CheckCircle2, AlertTriangle, 
   Settings, RefreshCw, Layers, LayoutGrid, Clock, LogOut, Sun, Moon,
-  Headset, ShieldCheck, UserCheck, KeyRound, Eye, EyeOff, MessageCircle 
+  Headset, ShieldCheck, UserCheck, KeyRound, Eye, EyeOff, MessageCircle,
+  Cloud, CloudOff 
 } from 'lucide-react';
 
 // Context
@@ -58,14 +59,16 @@ import SMSTickerGenerator from './components/SMSTickerGenerator';
 import EEULogo from './components/EEULogo';
 import WebLoginScreen from './components/WebLoginScreen';
 import FeedbackModal from './components/FeedbackModal';
+import { CloudSyncStatusModal } from './components/CloudSyncStatusModal';
 
 export default function App() {
   // 1. Theme State
   const { theme, resolvedTheme, setTheme, toggleTheme } = useTheme();
   const isDarkMode = resolvedTheme === 'dark';
 
-  // Feedback Modal State
+  // Feedback Modal & Cloud Status Modal State
   const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState<boolean>(false);
+  const [isCloudStatusModalOpen, setIsCloudStatusModalOpen] = useState<boolean>(false);
 
   // 2. Data State
   const {
@@ -76,7 +79,9 @@ export default function App() {
     deleteInterruption: handleDeleteInterruption,
     triggerToast,
     liveToast,
-    setLiveToast
+    setLiveToast,
+    isCloudSyncActive,
+    isQuotaExhausted
   } = useInterruptions();
 
   const [feedersList, setFeedersList] = useState<string[]>(() => {
@@ -201,22 +206,53 @@ export default function App() {
   }, []);
 
 
-  // Real-time synchronization across all terminals
+  // 1. Team Leader Notes: always active for urgent announcements & shift handovers (1 single doc read)
   useEffect(() => {
-    const unsubFeeders = subscribeToFeedersList(setFeedersList);
-    const unsubHub = subscribeToHubRecords(setHubRecords);
     const unsubNotes = subscribeToTeamLeaderNotes(setTeamLeaderNotes);
-    const unsubContacts = subscribeToCustomerContacts(setCustomerContacts);
-    const unsubLeaders = subscribeToTeamLeaders(setTeamLeaders);
-
     return () => {
-      unsubFeeders();
-      unsubHub();
       unsubNotes();
-      unsubContacts();
-      unsubLeaders();
     };
   }, []);
+
+  // 2. Feeder Master List: Admin-only listener (agents use local fast cache with 0 reads)
+  useEffect(() => {
+    if (isAdmin || userRole === 'admin') {
+      const unsubFeeders = subscribeToFeedersList(setFeedersList);
+      return () => {
+        unsubFeeders();
+      };
+    }
+  }, [isAdmin, userRole]);
+
+  // 3. CSC Hub Directory: Subscribe on-demand only when agent visits Hub tab or is admin
+  useEffect(() => {
+    if (currentTab === 'hub' || isAdmin) {
+      const unsubHub = subscribeToHubRecords(setHubRecords);
+      return () => {
+        unsubHub();
+      };
+    }
+  }, [currentTab, isAdmin]);
+
+  // 4. Customer Contacts: Subscribe on-demand only when agent visits Contacts tab or is admin
+  useEffect(() => {
+    if (currentTab === 'contacts' || isAdmin) {
+      const unsubContacts = subscribeToCustomerContacts(setCustomerContacts);
+      return () => {
+        unsubContacts();
+      };
+    }
+  }, [currentTab, isAdmin]);
+
+  // 5. Team Leaders: Subscribe only during login screen or admin/team leader management
+  useEffect(() => {
+    if (!isWebLoggedIn || isAdmin || userRole === 'admin' || currentTab === 'admin') {
+      const unsubLeaders = subscribeToTeamLeaders(setTeamLeaders);
+      return () => {
+        unsubLeaders();
+      };
+    }
+  }, [isWebLoggedIn, isAdmin, userRole, currentTab]);
 
   // Administrative functions
   const handleLoginAdmin = (pin: string): boolean => {
@@ -551,7 +587,6 @@ export default function App() {
               <h1 className="font-display font-bold text-[10px] tracking-tight text-[#5FA354] dark:text-[#5FA354] mt-0.5">Ethiopian Electric Utility</h1>
             </div>
           </div>
-
           <div className="flex items-center gap-2">
             <ThemeToggle variant="icon" />
             {/* Mobile Hamburger menu */}
@@ -644,6 +679,15 @@ export default function App() {
               className={`w-full p-2.5 rounded-lg text-xs font-semibold flex items-center gap-2 ${currentTab === 'contacts' ? 'bg-eeu-green text-white' : 'text-gray-600 dark:text-gray-400'}`}
             >
               Other Region Phone NO
+            </button>
+
+            <button
+              id="mob-nav-cloud-status"
+              onClick={() => { setIsCloudStatusModalOpen(true); setMobileMenuOpen(false); }}
+              className="w-full p-2.5 rounded-lg text-xs font-semibold flex items-center gap-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-900 cursor-pointer"
+            >
+              {isCloudSyncActive ? <Cloud className="w-4 h-4 text-emerald-500" /> : <CloudOff className="w-4 h-4 text-amber-500" />}
+              <span>{isCloudSyncActive ? 'Cloud Sync (Active)' : isQuotaExhausted ? 'Cloud Sync (Quota 50k Reached)' : 'Cloud Offline Mode'}</span>
             </button>
 
             <button
@@ -874,6 +918,12 @@ export default function App() {
           onClose={() => setIsFeedbackModalOpen(false)}
           userRole={isAdmin ? 'Admin' : userRole === 'team_leader' ? 'Team Leader' : 'Call Agent'}
           userName={isAdmin ? 'Admin' : currentTeamLeader?.name}
+        />
+
+        {/* CLOUD SYNC & QUOTA STATUS MODAL */}
+        <CloudSyncStatusModal
+          isOpen={isCloudStatusModalOpen}
+          onClose={() => setIsCloudStatusModalOpen(false)}
         />
 
       </div>
