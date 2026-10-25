@@ -23,16 +23,10 @@ export default function WebLoginScreen({ onLoginSuccess, teamLeaders = [] }: Web
   const [showForgotModal, setShowForgotModal] = useState(false);
   const [showHelpModal, setShowHelpModal] = useState(false);
 
-  // Load saved credentials if 'remember me' is checked
+  // Initialize remember me state; leave username and password blank so users can enter their own credentials freely
   useEffect(() => {
     const savedRemember = localStorage.getItem('eeu_remember_me') === 'true';
     setRememberMe(savedRemember);
-    if (savedRemember) {
-      const savedUser = localStorage.getItem('eeu_saved_username') || '';
-      const savedPass = localStorage.getItem('eeu_saved_password') || '';
-      setUsername(savedUser);
-      setPassword(savedPass);
-    }
   }, []);
 
   const processLogin = (targetUser: string, targetPass: string) => {
@@ -127,13 +121,6 @@ export default function WebLoginScreen({ onLoginSuccess, teamLeaders = [] }: Web
         (strippedUser === 'contactcenter' || strippedUser === 'callcenter' || strippedUser === 'agent' || strippedUser === 'eeu' || strippedUser === 'operator') && 
         (targetPass === 'Eeu@1234' || targetPass === 'eeu1234' || targetPass === 'Call@1234')
       ) {
-        saveCredentials(targetUser, targetPass);
-        onLoginSuccess('agent');
-        return;
-      }
-
-      // If user provided any non-empty credentials in development / demo mode, let them log in as agent
-      if (targetUser.trim().length >= 3 && targetPass.length >= 4) {
         saveCredentials(targetUser, targetPass);
         onLoginSuccess('agent');
         return;
