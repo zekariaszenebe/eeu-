@@ -351,7 +351,7 @@ export default function SMSTickerGenerator() {
                 <MessageSquare className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="text-base font-bold text-gray-900 dark:text-white leading-tight">
+                <h3 className="text-[15px] font-bold text-gray-900 dark:text-white leading-tight">
                   Complaint / Ticket Number
                 </h3>
                 <p className="text-xs text-gray-500 dark:text-zinc-400 mt-0.5">
@@ -523,7 +523,7 @@ export default function SMSTickerGenerator() {
                 <MessageSquare className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="text-base font-bold text-gray-900 dark:text-white leading-tight">
+                <h3 className="text-[15px] font-bold text-gray-900 dark:text-white leading-tight">
                   Smart Meter Token SMS
                 </h3>
                 <p className="text-xs text-gray-500 dark:text-zinc-400 mt-0.5">
@@ -712,7 +712,7 @@ export default function SMSTickerGenerator() {
           <div className="flex items-center gap-2 flex-wrap">
             <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-800 dark:text-zinc-200">
               <Languages className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
-              <span>Bulletin Language:</span>
+              <span>{digitalLanguage === 'am' ? 'ቋንቋ:' : digitalLanguage === 'om' ? 'Afaan:' : digitalLanguage === 'ti' ? 'ቋንቋ:' : 'Language:'}</span>
             </div>
             <div className="inline-flex items-center p-0.5 bg-gray-100 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl">
               {TICKET_LANGUAGES.map((lang) => {

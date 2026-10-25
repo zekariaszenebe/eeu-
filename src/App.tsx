@@ -681,14 +681,7 @@ export default function App() {
               Other Region Phone NO
             </button>
 
-            <button
-              id="mob-nav-cloud-status"
-              onClick={() => { setIsCloudStatusModalOpen(true); setMobileMenuOpen(false); }}
-              className="w-full p-2.5 rounded-lg text-xs font-semibold flex items-center gap-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-900 cursor-pointer"
-            >
-              {isCloudSyncActive ? <Cloud className="w-4 h-4 text-emerald-500" /> : <CloudOff className="w-4 h-4 text-amber-500" />}
-              <span>{isCloudSyncActive ? 'Cloud Sync (Active)' : isQuotaExhausted ? 'Cloud Sync (Quota 50k Reached)' : 'Cloud Offline Mode'}</span>
-            </button>
+
 
             <button
               id="mob-nav-feedback"
