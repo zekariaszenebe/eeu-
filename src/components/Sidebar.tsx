@@ -47,7 +47,6 @@ export default function Sidebar({
     { id: 'dashboard', name: 'Interruption Dashboard', icon: LayoutDashboard },
     ...(canManageFeed ? [{ id: 'admin', name: feedTabName, icon: ShieldAlert }] : []),
     { id: 'sms-ticker', name: 'SMS Ticket Generator', icon: MessageSquare },
-    ...(canManageFeed ? [{ id: 'history', name: 'Restored Feeders', icon: History }] : []),
     { id: 'calculator', name: 'Bill Calculator', icon: Calculator },
     { id: 'smartmeter', name: 'Smart Meter Calculator', icon: Gauge },
     { id: 'tariff', name: 'EEU Bill Tarrif', icon: FileSpreadsheet },

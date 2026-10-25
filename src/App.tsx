@@ -631,15 +631,7 @@ export default function App() {
               SMS Ticket Generator
             </button>
 
-            {(isAdmin || userRole === 'team_leader') && (
-              <button
-                id="mob-nav-history"
-                onClick={() => { setCurrentTab('history'); setMobileMenuOpen(false); }}
-                className={`w-full p-2.5 rounded-lg text-xs font-semibold flex items-center gap-2 ${currentTab === 'history' ? 'bg-eeu-green text-white' : 'text-gray-600 dark:text-gray-400'}`}
-              >
-                Restored Feeders
-              </button>
-            )}
+
 
             <button
               id="mob-nav-calculator"
@@ -824,9 +816,7 @@ export default function App() {
                 <SMSTickerGenerator />
               )}
 
-              {currentTab === 'history' && (
-                <ResolutionArchive interruptions={interruptions} />
-              )}
+
 
               {currentTab === 'calculator' && (
                 <BillCalculator />

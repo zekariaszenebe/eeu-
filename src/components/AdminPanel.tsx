@@ -533,23 +533,12 @@ export default function AdminPanel({
 
   const [resolvingId, setResolvingId] = useState<string | null>(null);
 
-  // Quick Resolve feeder toggler
+  // Quick Resolve / Delete feeder upon restoration
   const handleQuickResolve = async (item: FeederInterruption) => {
     if (resolvingId) return;
     setResolvingId(item.id);
     try {
-      const now = new Date();
-      await onUpdateInterruption(item.id, {
-        status: InterruptionStatus.RESTORED,
-        remark: `Restored: Power flow stable. verified active transmission grid. [Log updated at Admin Cabinet].`,
-        estimatedRestorationTime: now.toLocaleString('en-US', {
-          month: 'short',
-          day: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-          hour12: true
-        })
-      });
+      await onDeleteInterruption(item.id);
     } finally {
       setResolvingId(null);
     }
@@ -719,8 +708,6 @@ export default function AdminPanel({
     );
   });
 
-  // Outage filter state: default to 'active_only' so restored feeders are forgotten from the live disruptions board
-  const [outageFilter, setOutageFilter] = useState<'active_only' | 'all'>('active_only');
   const { clearAllRestoredFeeders } = useInterruptions();
   const [isClearingRestored, setIsClearingRestored] = useState(false);
 
@@ -738,18 +725,11 @@ export default function AdminPanel({
     }
   };
 
-  // Sort interruptions: Active disruptions on top, Restored feeders pushed to the bottom
+  // Sort interruptions: Active disruptions only (restored feeders live in the Restored Feeders archive tab)
   const sortedInterruptions = [...interruptions]
-    .filter(item => outageFilter === 'all' || !isFeederRestored(item))
+    .filter(item => !isFeederRestored(item))
     .sort((a, b) => {
-      const aRestored = isFeederRestored(a);
-      const bRestored = isFeederRestored(b);
-
-      // If one is restored and the other isn't, non-restored comes first
-      if (!aRestored && bRestored) return -1;
-      if (aRestored && !bRestored) return 1;
-
-      // Within the same status group, sort by lastUpdated descending (newest first)
+      // Within active outages, sort by lastUpdated descending (newest first)
       return (b.lastUpdated || '').localeCompare(a.lastUpdated || '');
     });
 
@@ -897,34 +877,8 @@ export default function AdminPanel({
         <div className="p-5 border-b border-gray-200/30 dark:border-gray-800/30 bg-transparent flex items-center justify-between flex-wrap gap-3">
           <div className="flex items-center gap-3 flex-wrap">
             <h3 className="font-display font-medium text-xs text-gray-600 dark:text-gray-400 uppercase tracking-wider">
-              {outageFilter === 'active_only' ? `Active Feeder Disruptions (${sortedInterruptions.length})` : `All Listed Disruptions (${interruptions.length})`}
+              Active Feeder Disruptions ({sortedInterruptions.length})
             </h3>
-
-            {/* Filter Toggle Pill */}
-            <div className="flex items-center p-0.5 bg-gray-100 dark:bg-gray-950 rounded-xl border border-gray-200 dark:border-gray-800 text-[11px] font-semibold">
-              <button
-                type="button"
-                onClick={() => setOutageFilter('active_only')}
-                className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
-                  outageFilter === 'active_only'
-                    ? 'bg-white dark:bg-gray-800 text-eeu-green shadow-xs font-bold'
-                    : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'
-                }`}
-              >
-                Active Only ({activeOutagesCount})
-              </button>
-              <button
-                type="button"
-                onClick={() => setOutageFilter('all')}
-                className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
-                  outageFilter === 'all'
-                    ? 'bg-white dark:bg-gray-800 text-eeu-green shadow-xs font-bold'
-                    : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'
-                }`}
-              >
-                All Records ({interruptions.length})
-              </button>
-            </div>
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
@@ -1672,7 +1626,7 @@ export default function AdminPanel({
                     onChange={(e) => setStatus(e.target.value as InterruptionStatus)}
                     className="w-full text-xs rounded-xl glass-input p-2.5 text-gray-900 dark:text-white focus:outline-none focus:ring-1.5 focus:ring-eeu-green"
                   >
-                    {Object.values(InterruptionStatus).map((s) => (
+                    {[InterruptionStatus.ACTIVE, InterruptionStatus.UNDER_INVESTIGATION].map((s) => (
                       <option key={s} value={s}>{s}</option>
                     ))}
                   </select>
