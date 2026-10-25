@@ -257,14 +257,15 @@ export function cleanOutagesList(list: FeederInterruption[]): FeederInterruption
   });
 }
 
-/**
- * Subscribes to interruptions updates using the single state document pattern.
- * Authoritative cloud state is synchronized without reviving locally deleted records.
- */
+// Singleton subscription manager to prevent redundant listeners
+const subscriptionMap = new Map<string, { unsub: () => void, callbacks: Set<(data: any) => void> }>();
+
 export function subscribeToInterruptions(onUpdate: (items: FeederInterruption[]) => void, onlyActive: boolean = true) {
-  try {
+  const docPath = 'systemSettings/liveInterruptions';
+  
+  if (!subscriptionMap.has(docPath)) {
     const liveDocRef = doc(db, 'systemSettings', 'liveInterruptions');
-    return onSnapshot(liveDocRef, (snap) => {
+    const unsub = onSnapshot(liveDocRef, (snap) => {
       let outages: FeederInterruption[] = [];
 
       if (snap.exists()) {
@@ -273,7 +274,6 @@ export function subscribeToInterruptions(onUpdate: (items: FeederInterruption[])
           outages = cleanOutagesList(data.outages as FeederInterruption[]);
         }
       } else {
-        // Document does not exist yet on fresh Firebase instance; initialize once
         const localCached = cleanOutagesList(getLocal<FeederInterruption[]>('eeu-interruptions', []));
         outages = localCached;
         if (!isFirestoreQuotaExhausted()) {
@@ -283,17 +283,31 @@ export function subscribeToInterruptions(onUpdate: (items: FeederInterruption[])
 
       notifyCloudStatus(true, false);
       setLocal('eeu-interruptions', outages);
-      onUpdate(outages);
+      
+      // Notify all registered callbacks
+      subscriptionMap.get(docPath)?.callbacks.forEach(cb => cb(outages));
     }, (err) => {
-      handleFirestoreError(err, OperationType.GET, 'systemSettings/liveInterruptions');
+      handleFirestoreError(err, OperationType.GET, docPath);
       const cached = cleanOutagesList(getLocal<FeederInterruption[]>('eeu-interruptions', []));
-      onUpdate(cached);
+      subscriptionMap.get(docPath)?.callbacks.forEach(cb => cb(cached));
     });
-  } catch {
-    const cached = cleanOutagesList(getLocal<FeederInterruption[]>('eeu-interruptions', []));
-    onUpdate(cached);
-    return () => {};
+    
+    subscriptionMap.set(docPath, { unsub, callbacks: new Set() });
   }
+
+  const manager = subscriptionMap.get(docPath)!;
+  manager.callbacks.add(onUpdate);
+  
+  // Return initial data immediately
+  onUpdate(cleanOutagesList(getLocal<FeederInterruption[]>('eeu-interruptions', [])));
+
+  return () => {
+    manager.callbacks.delete(onUpdate);
+    if (manager.callbacks.size === 0) {
+      manager.unsub();
+      subscriptionMap.delete(docPath);
+    }
+  };
 }
 
 /**
