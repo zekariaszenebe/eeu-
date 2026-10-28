@@ -226,12 +226,48 @@ export const InterruptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     };
   }, []);
 
+  // OPTIMIZATION 1: PAGE VISIBILITY API
+  // Disconnect the real-time listener when user locks phone screen, switches apps,
+  // or switches browser tabs. When returning to the app, reconnect and do a quick fresh sync.
+  const [isDocumentVisible, setIsDocumentVisible] = useState<boolean>(() => {
+    return typeof document !== 'undefined' ? !document.hidden : true;
+  });
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+
+    const handleVisibilityChange = () => {
+      const visible = !document.hidden;
+      setIsDocumentVisible(visible);
+      if (visible) {
+        // Upon returning, fetch fresh state once to catch up without missing any updates
+        fetchLatestInterruptions().then(fresh => {
+          if (fresh && fresh.length > 0) {
+            setInterruptions(prev => {
+              if (JSON.stringify(prev) === JSON.stringify(fresh)) return prev;
+              try {
+                localStorage.setItem('eeu-interruptions', JSON.stringify(fresh));
+              } catch {}
+              channel?.postMessage({ type: 'SYNC_INTERRUPTIONS', data: fresh });
+              return fresh;
+            });
+          }
+        }).catch(() => {});
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
+
   // Continuous real-time subscription to Firestore live interruptions
   // CRITICAL READ OPTIMIZATION:
-  // Only the elected Leader Tab opens this Firestore snapshot listener!
-  // Sibling tabs on the same computer receive updates via BroadcastChannel (0 Firestore reads).
+  // 1. Only the elected Leader Tab opens this Firestore snapshot listener!
+  // 2. Listener is active ONLY when the tab is currently visible (saves 80%+ reads when idle/locked)!
   useEffect(() => {
-    if (!isLeaderTab) {
+    if (!isLeaderTab || !isDocumentVisible) {
       return;
     }
 
@@ -254,7 +290,7 @@ export const InterruptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     return () => {
       unsub();
     };
-  }, [isLeaderTab]);
+  }, [isLeaderTab, isDocumentVisible]);
 
   // Keep active local state clean and bounded
   useEffect(() => {

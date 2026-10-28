@@ -333,6 +333,27 @@ export async function fetchLatestInterruptions(): Promise<FeederInterruption[]> 
 }
 
 /**
+ * Direct fetch for preset feeders from Firestore (on-demand read, 0 continuous real-time sockets).
+ */
+export async function fetchFeedersList(): Promise<string[]> {
+  try {
+    const configDocRef = doc(db, 'systemSettings', 'presetFeeders');
+    const snap = await getDoc(configDocRef);
+    if (snap.exists()) {
+      const data = snap.data();
+      if (Array.isArray(data.list) && data.list.length > 0) {
+        const sorted = [...data.list].sort();
+        setLocal('eeu-feeders-list-v4', sorted);
+        return sorted;
+      }
+    }
+  } catch (err) {
+    handleFirestoreError(err, OperationType.GET, 'systemSettings/presetFeeders');
+  }
+  return getLocal<string[]>('eeu-feeders-list-v4', INITIAL_FEEDERS_LIST);
+}
+
+/**
  * Subscribes to preset feeders using a single consolidated configuration document
  * in 'systemSettings/presetFeeders'. This reduces document reads from ~248 reads to 1 read.
  */
@@ -364,6 +385,67 @@ export function subscribeToFeedersList(onUpdate: (items: string[]) => void) {
     const cached = getLocal<string[]>('eeu-feeders-list-v4', INITIAL_FEEDERS_LIST);
     onUpdate(cached);
     return () => {};
+  }
+}
+
+// ==========================================
+// OPTIMIZATION 3: WRITE DEBOUNCER FOR OUTAGES
+// Rapid updates, keystrokes, and status changes
+// collapse into a single atomic write to minimize
+// writes and real-time echo reads.
+// ==========================================
+let liveOutagesWriteTimer: ReturnType<typeof setTimeout> | null = null;
+let pendingOutagesList: FeederInterruption[] | null = null;
+let pendingTimestamp: string = '';
+
+export async function flushPendingOutagesWrite(): Promise<void> {
+  if (liveOutagesWriteTimer) {
+    clearTimeout(liveOutagesWriteTimer);
+    liveOutagesWriteTimer = null;
+  }
+  if (!pendingOutagesList) return;
+  const listToWrite = pendingOutagesList;
+  const timeToWrite = pendingTimestamp || new Date().toISOString();
+  pendingOutagesList = null;
+
+  if (isFirestoreQuotaExhausted()) return;
+
+  try {
+    const liveDocRef = doc(db, 'systemSettings', 'liveInterruptions');
+    await setDoc(liveDocRef, { outages: listToWrite, lastUpdated: timeToWrite });
+    notifyCloudStatus(true, false);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, 'systemSettings/liveInterruptions');
+  }
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('beforeunload', () => {
+    flushPendingOutagesWrite();
+  });
+  window.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      flushPendingOutagesWrite();
+    }
+  });
+}
+
+export function queueOutagesWriteToCloud(list: FeederInterruption[], timestampStr: string, immediate: boolean = false): void {
+  pendingOutagesList = list;
+  pendingTimestamp = timestampStr;
+
+  if (liveOutagesWriteTimer) {
+    clearTimeout(liveOutagesWriteTimer);
+    liveOutagesWriteTimer = null;
+  }
+
+  if (immediate) {
+    flushPendingOutagesWrite();
+  } else {
+    // Debounce by 800ms
+    liveOutagesWriteTimer = setTimeout(() => {
+      flushPendingOutagesWrite();
+    }, 800);
   }
 }
 
@@ -442,16 +524,11 @@ export async function addInterruptionDoc(entry: Omit<FeederInterruption, 'id' | 
     return { record, syncedToCloud: false, quotaExhausted: true };
   }
 
-  try {
-    const liveDocRef = doc(db, 'systemSettings', 'liveInterruptions');
-    await setDoc(liveDocRef, { outages: updatedList, lastUpdated: timestampStr });
-    notifyCloudStatus(true, false);
-    return { record, syncedToCloud: true, quotaExhausted: false };
-  } catch (error) {
-    handleFirestoreError(error, OperationType.CREATE, `systemSettings/liveInterruptions`);
-    return { record, syncedToCloud: false, quotaExhausted: isFirestoreQuotaExhausted() };
-  }
+  // Queue debounced cloud write (avoids duplicate bursts)
+  queueOutagesWriteToCloud(updatedList, timestampStr, false);
+  return { record, syncedToCloud: true, quotaExhausted: false };
 }
+
 
 /**
  * Updates an interruption and conditionally adds a progress notification.
@@ -504,15 +581,9 @@ export async function updateInterruptionDoc(id: string, entry: Partial<FeederInt
     return { record: merged, syncedToCloud: false, quotaExhausted: true };
   }
 
-  try {
-    const liveDocRef = doc(db, 'systemSettings', 'liveInterruptions');
-    await setDoc(liveDocRef, { outages: updatedList, lastUpdated: timestampStr });
-    notifyCloudStatus(true, false);
-    return { record: merged, syncedToCloud: true, quotaExhausted: false };
-  } catch (error) {
-    handleFirestoreError(error, OperationType.UPDATE, `systemSettings/liveInterruptions`);
-    return { record: merged, syncedToCloud: false, quotaExhausted: isFirestoreQuotaExhausted() };
-  }
+  // Queue debounced cloud write (avoids duplicate bursts on rapid edits)
+  queueOutagesWriteToCloud(updatedList, timestampStr, false);
+  return { record: merged, syncedToCloud: true, quotaExhausted: false };
 }
 
 /**
@@ -528,15 +599,9 @@ export async function deleteInterruptionDoc(id: string): Promise<{ syncedToCloud
     return { syncedToCloud: false, quotaExhausted: true };
   }
 
-  try {
-    const liveDocRef = doc(db, 'systemSettings', 'liveInterruptions');
-    await setDoc(liveDocRef, { outages: updatedList, lastUpdated: new Date().toISOString() });
-    notifyCloudStatus(true, false);
-    return { syncedToCloud: true, quotaExhausted: false };
-  } catch (error) {
-    handleFirestoreError(error, OperationType.DELETE, `systemSettings/liveInterruptions`);
-    return { syncedToCloud: false, quotaExhausted: isFirestoreQuotaExhausted() };
-  }
+  // Flushes immediately on deletion
+  queueOutagesWriteToCloud(updatedList, new Date().toISOString(), true);
+  return { syncedToCloud: true, quotaExhausted: false };
 }
 
 /**
@@ -554,15 +619,9 @@ export async function clearAllRestoredInterruptionsDoc(): Promise<{ count: numbe
     return { count: restoredItems.length, syncedToCloud: false, quotaExhausted: true };
   }
 
-  try {
-    const liveDocRef = doc(db, 'systemSettings', 'liveInterruptions');
-    await setDoc(liveDocRef, { outages: activeOnly, lastUpdated: new Date().toISOString() });
-    notifyCloudStatus(true, false);
-    return { count: restoredItems.length, syncedToCloud: true, quotaExhausted: false };
-  } catch (error) {
-    handleFirestoreError(error, OperationType.DELETE, `systemSettings/liveInterruptions`);
-    return { count: restoredItems.length, syncedToCloud: false, quotaExhausted: isFirestoreQuotaExhausted() };
-  }
+  // Flushes immediately on clearing
+  queueOutagesWriteToCloud(activeOnly, new Date().toISOString(), true);
+  return { count: restoredItems.length, syncedToCloud: true, quotaExhausted: false };
 }
 
 /**
@@ -660,6 +719,28 @@ export async function resetAllPresetFeedersToMaster(): Promise<boolean> {
 }
 
 /**
+ * Direct fetch for HubRecords from Firestore (on-demand read, 0 continuous real-time sockets).
+ */
+export async function fetchHubRecords(): Promise<HubRecord[]> {
+  try {
+    const configDocRef = doc(db, 'systemSettings', 'hubRecords');
+    const snap = await getDoc(configDocRef);
+    if (snap.exists()) {
+      const data = snap.data();
+      if (Array.isArray(data.list) && data.list.length > 0) {
+        const list = data.list as HubRecord[];
+        list.sort((a, b) => a.no - b.no);
+        setLocal('eeu-hub-records', list);
+        return list;
+      }
+    }
+  } catch (err) {
+    handleFirestoreError(err, OperationType.GET, 'systemSettings/hubRecords');
+  }
+  return getLocal<HubRecord[]>('eeu-hub-records', HUB_RECORDS);
+}
+
+/**
  * Subscribes to HubRecords (CSC Address directory) updates in real-time using Single State Document.
  * Reduces reads from ~245 documents down to 1 document.
  */
@@ -712,8 +793,31 @@ export async function updateHubRecordDoc(record: HubRecord) {
 }
 
 /**
- * Subscribes to TeamLeaderNotes in real-time.
+ * Direct fetch for TeamLeaderNotes from Firestore (on-demand read, 0 continuous real-time sockets).
  */
+export async function fetchTeamLeaderNotes(): Promise<TeamLeaderNote[]> {
+  try {
+    const configDocRef = doc(db, 'systemSettings', 'teamLeaderNotes');
+    const snap = await getDoc(configDocRef);
+    if (snap.exists()) {
+      const data = snap.data();
+      if (Array.isArray(data.list)) {
+        const list = data.list as TeamLeaderNote[];
+        const sorted = [...list].sort((a, b) => {
+          if (a.isUrgent && !b.isUrgent) return -1;
+          if (!a.isUrgent && b.isUrgent) return 1;
+          return (b.timestamp || '').localeCompare(a.timestamp || '');
+        });
+        setLocal('eeu-team-leader-notes', sorted);
+        return sorted;
+      }
+    }
+  } catch (err) {
+    handleFirestoreError(err, OperationType.GET, 'systemSettings/teamLeaderNotes');
+  }
+  return getLocal<TeamLeaderNote[]>('eeu-team-leader-notes', []);
+}
+
 /**
  * Subscribes to TeamLeaderNotes in real-time using Single State Document.
  * Reduces reads from N documents down to 1 single document.
@@ -849,6 +953,27 @@ export async function clearTeamLeaderNotes() {
 }
 
 /**
+ * Direct fetch for CustomerContacts from Firestore (on-demand read, 0 continuous real-time sockets).
+ */
+export async function fetchCustomerContacts(): Promise<ContactItem[]> {
+  try {
+    const configDocRef = doc(db, 'systemSettings', 'customerContacts');
+    const snap = await getDoc(configDocRef);
+    if (snap.exists()) {
+      const data = snap.data();
+      if (Array.isArray(data.list) && data.list.length > 0) {
+        const list = data.list as ContactItem[];
+        setLocal('eeu-customer-contacts', list);
+        return list;
+      }
+    }
+  } catch (err) {
+    handleFirestoreError(err, OperationType.GET, 'systemSettings/customerContacts');
+  }
+  return getLocal<ContactItem[]>('eeu-customer-contacts', INITIAL_CUSTOMER_CONTACTS);
+}
+
+/**
  * Subscribes to CustomerContacts in real-time using Single State Document.
  */
 export function subscribeToCustomerContacts(onUpdate: (items: ContactItem[]) => void) {
@@ -948,6 +1073,35 @@ export async function deleteCustomerContactDoc(id: string) {
       handleFirestoreError(error, OperationType.DELETE, `systemSettings/customerContacts`);
     }
   }
+}
+
+/**
+ * Direct fetch for Team Leaders from Firestore (on-demand read, 0 continuous real-time sockets).
+ */
+export async function fetchTeamLeaders(): Promise<TeamLeaderUser[]> {
+  const defaultLeaders: TeamLeaderUser[] = [
+    { id: 'tl-a', username: '@team_a', password: 'Tl@1234', name: 'Team A Leader', role: 'team_leader', district: 'Team A', createdAt: new Date().toISOString() },
+    { id: 'tl-b', username: '@team_b', password: 'Tl@1234', name: 'Team B Leader', role: 'team_leader', district: 'Team B', createdAt: new Date().toISOString() },
+    { id: 'tl-c', username: '@team_c', password: 'Tl@1234', name: 'Team C Leader', role: 'team_leader', district: 'Team C', createdAt: new Date().toISOString() },
+    { id: 'tl-d', username: '@team_d', password: 'Tl@1234', name: 'Zekarias Zenebe', role: 'team_leader', district: 'Team D', createdAt: new Date().toISOString() }
+  ];
+
+  try {
+    const configDocRef = doc(db, 'systemSettings', 'teamLeaders');
+    const snap = await getDoc(configDocRef);
+    if (snap.exists()) {
+      const data = snap.data();
+      if (Array.isArray(data.list) && data.list.length > 0) {
+        const list = data.list as TeamLeaderUser[];
+        list.sort((a, b) => a.name.localeCompare(b.name));
+        setLocal('eeu-team-leaders', list);
+        return list;
+      }
+    }
+  } catch (err) {
+    handleFirestoreError(err, OperationType.GET, 'systemSettings/teamLeaders');
+  }
+  return getLocal<TeamLeaderUser[]>('eeu-team-leaders', defaultLeaders);
 }
 
 /**

@@ -18,6 +18,7 @@ import { FEEDERS_VERSION } from './data/feedersList';
 // Firestore Services
 import { 
   seedInitialDataIfEmpty,
+  fetchFeedersList,
   subscribeToFeedersList,
   addInterruptionDoc,
   updateInterruptionDoc,
@@ -26,17 +27,21 @@ import {
   addPresetFeederDoc,
   deletePresetFeederDoc,
   resetAllPresetFeedersToMaster,
+  fetchHubRecords,
   subscribeToHubRecords,
   updateHubRecordDoc,
+  fetchTeamLeaderNotes,
   subscribeToTeamLeaderNotes,
   addTeamLeaderNoteDoc,
   updateTeamLeaderNoteDoc,
   deleteTeamLeaderNoteDoc,
   clearTeamLeaderNotes,
+  fetchCustomerContacts,
   subscribeToCustomerContacts,
   addCustomerContactDoc,
   updateCustomerContactDoc,
   deleteCustomerContactDoc,
+  fetchTeamLeaders,
   subscribeToTeamLeaders,
   addTeamLeaderDoc,
   updateTeamLeaderDoc,
@@ -206,51 +211,48 @@ export default function App() {
   }, []);
 
 
-  // 1. Team Leader Notes: always active for urgent announcements & shift handovers (1 single doc read)
+  // OPTIMIZATION 2: ON-DEMAND FETCHING FOR STATIC DATA
+  // Replaces continuous 24/7 onSnapshot listeners with on-demand getDoc fetches.
+  // 1. Team Leader Notes: Fetch on-demand on load (0 continuous real-time sockets)
   useEffect(() => {
-    const unsubNotes = subscribeToTeamLeaderNotes(setTeamLeaderNotes);
-    return () => {
-      unsubNotes();
-    };
+    fetchTeamLeaderNotes().then(notes => {
+      if (notes && notes.length > 0) setTeamLeaderNotes(notes);
+    }).catch(() => {});
   }, []);
 
-  // 2. Feeder Master List: Admin-only listener (agents use local fast cache with 0 reads)
+  // 2. Feeder Master List: Admin-only on-demand fetch (agents use local fast cache with 0 reads)
   useEffect(() => {
     if (isAdmin || userRole === 'admin') {
-      const unsubFeeders = subscribeToFeedersList(setFeedersList);
-      return () => {
-        unsubFeeders();
-      };
+      fetchFeedersList().then(list => {
+        if (list && list.length > 0) setFeedersList(list);
+      }).catch(() => {});
     }
   }, [isAdmin, userRole]);
 
-  // 3. CSC Hub Directory: Subscribe on-demand only when agent visits Hub tab or is admin
+  // 3. CSC Hub Directory: Fetch on-demand only when agent visits Hub tab or is admin
   useEffect(() => {
     if (currentTab === 'hub' || isAdmin) {
-      const unsubHub = subscribeToHubRecords(setHubRecords);
-      return () => {
-        unsubHub();
-      };
+      fetchHubRecords().then(records => {
+        if (records && records.length > 0) setHubRecords(records);
+      }).catch(() => {});
     }
   }, [currentTab, isAdmin]);
 
-  // 4. Customer Contacts: Subscribe on-demand only when agent visits Contacts tab or is admin
+  // 4. Customer Contacts: Fetch on-demand only when agent visits Contacts tab or is admin
   useEffect(() => {
     if (currentTab === 'contacts' || isAdmin) {
-      const unsubContacts = subscribeToCustomerContacts(setCustomerContacts);
-      return () => {
-        unsubContacts();
-      };
+      fetchCustomerContacts().then(contacts => {
+        if (contacts && contacts.length > 0) setCustomerContacts(contacts);
+      }).catch(() => {});
     }
   }, [currentTab, isAdmin]);
 
-  // 5. Team Leaders: Subscribe only during login screen or admin/team leader management
+  // 5. Team Leaders: Fetch on-demand for login screen or admin management
   useEffect(() => {
     if (!isWebLoggedIn || isAdmin || userRole === 'admin' || currentTab === 'admin') {
-      const unsubLeaders = subscribeToTeamLeaders(setTeamLeaders);
-      return () => {
-        unsubLeaders();
-      };
+      fetchTeamLeaders().then(leaders => {
+        if (leaders && leaders.length > 0) setTeamLeaders(leaders);
+      }).catch(() => {});
     }
   }, [isWebLoggedIn, isAdmin, userRole, currentTab]);
 
