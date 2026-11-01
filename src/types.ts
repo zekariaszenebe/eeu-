@@ -136,3 +136,9 @@ export function stripBrackets(name: string | undefined): string {
   return name.replace(/\s*\(.*?\)/g, '').trim();
 }
 
+export function isInfoFeeder(name: string | undefined | null): boolean {
+  if (!name) return false;
+  const stripped = stripBrackets(name).trim().toUpperCase();
+  return stripped === 'INFO' || stripped.startsWith('INFO ') || stripped.startsWith('INFO-') || stripped.startsWith('INFO:');
+}
+

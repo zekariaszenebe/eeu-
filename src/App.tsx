@@ -95,6 +95,11 @@ export default function App() {
       try {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
+          if (!parsed.some((f: string) => f.startsWith('INFO'))) {
+            const updated = ['INFO (የመረጃ እና ማሳሰቢያ ማጋሪያ / General Information & Updates) | East', ...parsed];
+            localStorage.setItem('eeu-feeders-list-v4', JSON.stringify(updated));
+            return updated;
+          }
           return parsed;
         }
       } catch (e) {

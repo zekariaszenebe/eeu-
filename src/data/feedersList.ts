@@ -1,7 +1,10 @@
 // Master list of 250 Feeder Lines
-export const FEEDERS_VERSION = 'v5-250-blackline-updated';
+export const FEEDERS_VERSION = 'v6-250-info-updated';
 
 export const INITIAL_FEEDERS_LIST: string[] = [
+  // 0. GENERAL INFORMATION & TEAM LEADER BULLETINS
+  'INFO (የመረጃ እና ማሳሰቢያ ማጋሪያ / General Information & Updates) | East',
+
   // 1. ADDIS CENTER
   'ADDIS CENTER - ADC-04 (ሜክሲኮ ደብረወርቅ ሕንጻ፣ ለገሐር ጀርባ ፣ ለገሐር አሸዋ ተራ ፣ ኤግዝቢሽን ሴንተር፣ ፍላሚንጎ፣ኦሎምፒያ ፣ ደንበል፣ ደንበል ጀርባ፣ ፐርፕል ካፌ ፣ ቦሌ ማተሚያ ቤት ፤ ወሎ ሰፈር በከፊል)',
   'ADDIS CENTER - ADC-05 (ገነት ሆቴል፣ ቡልጋሪያ አካባቢ ፤ ቄራ ፤ ኦሮሚያ ሳርቤት ቢሮ እና አካባቢው)',

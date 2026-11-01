@@ -6,9 +6,9 @@ import {
   Columns, Rows, Zap, Settings, Compass, ArrowUp, ArrowDown, ArrowLeft, ArrowRight,
   Trash2, Edit3, Plus, MessageSquare, AlertCircle, Languages,
   Undo, Redo, Bold, Italic, Underline, Strikethrough, AlignLeft, AlignCenter, AlignRight, AlignJustify, Table, ChevronDown,
-  Activity, Gauge, PowerOff, Server
+  Activity, Gauge, PowerOff, Server, Pin
 } from 'lucide-react';
-import { FeederInterruption, InterruptionType, InterruptionStatus, normalizeInterruptionType, stripBrackets, TeamLeaderNote, isPlannedOrOperational, isFeederRestored } from '../types';
+import { FeederInterruption, InterruptionType, InterruptionStatus, normalizeInterruptionType, stripBrackets, TeamLeaderNote, isPlannedOrOperational, isFeederRestored, isInfoFeeder } from '../types';
 import { INITIAL_DISTRICTS } from '../data/mockData';
 import { INITIAL_FEEDERS_LIST } from '../data/feedersList';
 import { addTeamLeaderNoteDoc, updateTeamLeaderNoteDoc, deleteTeamLeaderNoteDoc } from '../lib/firestoreService';
@@ -157,6 +157,23 @@ export function InterruptionTypeBadge({ type }: { type: InterruptionType | strin
 }
 
 export function formatInterruptionShareText(item: FeederInterruption, lang: LanguageMode = 'en'): string {
+  const isInfo = isInfoFeeder(item.feederName);
+  const feeder = stripBrackets(item.feederName);
+
+  if (isInfo) {
+    return [
+      `📢 EEU OPERATIONAL BULLETIN / INFORMATION`,
+      `━━━━━━━━━━━━━━━━━━━━━━━━━━`,
+      `📌 Bulletin: ${feeder}`,
+      `🕒 Posted Time: ${item.startTime}`,
+      `📝 Information Content:`,
+      `${item.affectedArea}`,
+      item.remark ? `ℹ️ Remarks: ${item.remark}` : '',
+      `━━━━━━━━━━━━━━━━━━━━━━━━━━`,
+      `Ethiopian Electric Utility (EEU)`
+    ].filter(Boolean).join('\n');
+  }
+
   const normalizedType = normalizeInterruptionType(item.type);
   let typeDisplay: string = normalizedType;
   if (typeof item.type === 'string') {
@@ -166,7 +183,6 @@ export function formatInterruptionShareText(item: FeederInterruption, lang: Lang
     }
   }
 
-  const feeder = stripBrackets(item.feederName);
   const areas = lang === 'en' ? translateAmharicLocation(item.affectedArea) : item.affectedArea;
   const showEstRestore = isPlannedOrOperational(item.type) && item.estimatedRestorationTime && item.estimatedRestorationTime !== 'N/A';
 
@@ -702,8 +718,13 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
     return matchesSearch && matchesDistrict && matchesType && matchesDirection;
   });
 
-  // Process Sorting
+  // Process Sorting: Pinned INFO bulletins always stay first at the top
   const sortedItems = [...filteredItems].sort((a, b) => {
+    const isInfoA = isInfoFeeder(a.feederName);
+    const isInfoB = isInfoFeeder(b.feederName);
+    if (isInfoA && !isInfoB) return -1;
+    if (!isInfoA && isInfoB) return 1;
+
     if (sortBy === 'name') {
       return a.feederName.localeCompare(b.feederName);
     }
@@ -726,7 +747,7 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
     status: InterruptionStatus;
   }> = [];
 
-  displayInterruptions.filter(item => !isFeederRestored(item)).forEach((item) => {
+  displayInterruptions.filter(item => !isFeederRestored(item) && !isInfoFeeder(item.feederName)).forEach((item) => {
     // Combine explicit affectedArea with the feeder's master preset areas (e.g. MEK-02 covers Lebu, Chad Embassy, 72 Menbere...)
     const presetAreas = getPresetAreasForFeeder(item.feederName);
     const combinedAreaStr = [item.affectedArea, presetAreas].filter(Boolean).join(' ፤ ');
@@ -813,27 +834,29 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
       directionStats[dir].total += 1;
       directionStats[dir].active += 1;
 
-      // Capture unique clean location names for preview inside direction card only for active outages
-      const rawParts = item.affectedArea.split(/[፣、፤,;]+/);
-      rawParts.forEach((part) => {
-        let trimmed = part.trim();
-        
-        if (trimmed.endsWith('።')) {
-          trimmed = trimmed.replace(/።+$/, '');
-        }
-        
-        if (
-          trimmed.length >= 2 && 
-          !trimmed.startsWith('በክፊል') && 
-          !trimmed.startsWith('በከፊል') && 
-          !trimmed.endsWith('ያልቃል') && 
-          !trimmed.startsWith('እና አካባቢው')
-        ) {
-          if (!directionStats[dir].areas.includes(trimmed)) {
-            directionStats[dir].areas.push(trimmed);
+      // Capture unique clean location names for preview inside direction card only for active outages (skip INFO bulletin texts)
+      if (!isInfoFeeder(item.feederName)) {
+        const rawParts = item.affectedArea.split(/[፣、፤,;]+/);
+        rawParts.forEach((part) => {
+          let trimmed = part.trim();
+          
+          if (trimmed.endsWith('።')) {
+            trimmed = trimmed.replace(/።+$/, '');
           }
-        }
-      });
+          
+          if (
+            trimmed.length >= 2 && 
+            !trimmed.startsWith('በክፊል') && 
+            !trimmed.startsWith('በከፊል') && 
+            !trimmed.endsWith('ያልቃል') && 
+            !trimmed.startsWith('እና አካባቢው')
+          ) {
+            if (!directionStats[dir].areas.includes(trimmed)) {
+              directionStats[dir].areas.push(trimmed);
+            }
+          }
+        });
+      }
     } else {
       directionStats[dir].restored += 1;
     }
@@ -1183,7 +1206,15 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
             return (
               <div id="outages-horizontal-layout" className="space-y-8">
                 {directionsToRender.map((dir) => {
-                  const itemsInDir = sortedItems.filter(item => (item.direction || getCardinalDirection(item.district, item.feederName)) === dir);
+                  const itemsInDir = sortedItems
+                    .filter(item => (item.direction || getCardinalDirection(item.district, item.feederName)) === dir)
+                    .sort((a, b) => {
+                      const aIsInfo = isInfoFeeder(a.feederName);
+                      const bIsInfo = isInfoFeeder(b.feederName);
+                      if (aIsInfo && !bIsInfo) return -1;
+                      if (!aIsInfo && bIsInfo) return 1;
+                      return 0;
+                    });
                   if (itemsInDir.length === 0) return null;
 
                   return (
@@ -1192,66 +1223,82 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
                       <div className="space-y-4">
                         {itemsInDir.map((item) => {
                           const isRestored = item.status === InterruptionStatus.RESTORED;
+                          const isInfo = isInfoFeeder(item.feederName);
 
                           return (
                             <div
                               id={`feeder-wide-card-${item.id}`}
                               key={`wide-${item.id}`}
                               className={`glass-card p-5 rounded-3xl flex flex-col lg:flex-row lg:items-center justify-between gap-6 transition-all ${
-                                isRestored ? 'opacity-60 border-gray-250/30' : 'border-l-4 border-l-eeu-green'
+                                isRestored 
+                                  ? 'opacity-60 border-gray-250/30' 
+                                  : isInfo
+                                  ? 'border-l-4 border-l-amber-500 bg-amber-500/[0.04] dark:bg-amber-950/20 ring-1 ring-amber-500/30 shadow-md'
+                                  : 'border-l-4 border-l-eeu-green'
                               }`}
                             >
                               {/* Left Column: Feeder & District details */}
                               <div className="lg:w-1/4 space-y-2">
                                 <div className="flex items-center gap-2 flex-wrap">
-                                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-wider ${
-                                    item.status === InterruptionStatus.ACTIVE
-                                      ? 'bg-red-500/10 text-red-600'
-                                      : item.status === InterruptionStatus.UNDER_INVESTIGATION
-                                      ? 'bg-amber-500/10 text-amber-600'
-                                      : 'bg-green-500/10 text-green-600'
-                                  }`}>
-                                    <span className={`w-1.5 h-1.5 rounded-full ${
+                                  {isInfo && (
+                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/40 shadow-xs">
+                                      <Pin className="w-3 h-3 fill-amber-500 text-amber-600 dark:text-amber-400" />
+                                      PINNED INFO
+                                    </span>
+                                  )}
+                                  {!isInfo && (
+                                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-wider ${
                                       item.status === InterruptionStatus.ACTIVE
-                                        ? 'bg-red-500 animate-pulse'
+                                        ? 'bg-red-500/10 text-red-600'
                                         : item.status === InterruptionStatus.UNDER_INVESTIGATION
-                                        ? 'bg-amber-500'
-                                        : 'bg-green-500'
-                                    }`} />
-                                    {item.status}
-                                  </span>
+                                        ? 'bg-amber-500/10 text-amber-600'
+                                        : 'bg-green-500/10 text-green-600'
+                                    }`}>
+                                      <span className={`w-1.5 h-1.5 rounded-full ${
+                                        item.status === InterruptionStatus.ACTIVE
+                                          ? 'bg-red-500 animate-pulse'
+                                          : item.status === InterruptionStatus.UNDER_INVESTIGATION
+                                          ? 'bg-amber-500'
+                                          : 'bg-green-500'
+                                      }`} />
+                                      {item.status}
+                                    </span>
+                                  )}
                                 </div>
 
-                                <h3 className="font-display font-bold text-gray-950 dark:text-white text-base leading-tight">
-                                  {stripBrackets(item.feederName)}
+                                <h3 className="font-display font-bold text-gray-950 dark:text-white text-base leading-tight flex items-center gap-1.5">
+                                  {isInfo && <Info className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />}
+                                  <span>{stripBrackets(item.feederName)}</span>
                                 </h3>
-                                <div className="pt-0.5">
-                                  <InterruptionTypeBadge type={item.type} />
-                                </div>
+                                {!isInfo && (
+                                  <div className="pt-0.5">
+                                    <InterruptionTypeBadge type={item.type} />
+                                  </div>
+                                )}
                               </div>
 
                               {/* Center Column: Affected Neighborhoods & Remark */}
                               <div className="flex-1 space-y-2">
-                                <div className="p-3.5 rounded-2xl bg-gray-100/40 dark:bg-gray-950/40 border border-gray-200/30 dark:border-gray-850/40 text-xs lg:w-[670px] w-full">
+                                <div className={`p-3.5 rounded-2xl ${
+                                  isInfo 
+                                    ? 'bg-amber-500/10 dark:bg-amber-950/30 border border-amber-500/30' 
+                                    : 'bg-gray-100/40 dark:bg-gray-950/40 border border-gray-200/30 dark:border-gray-850/40'
+                                } text-xs lg:w-[670px] w-full`}>
                                   <div className="font-semibold text-gray-400 dark:text-gray-500 uppercase text-[9px] tracking-wider mb-1.5 font-sans flex items-center justify-between">
-                                    <span>Affected Areas & Landmarks</span>
-                                    <span className="font-mono text-[9px] text-eeu-green bg-eeu-green/10 px-1.5 py-0.2 rounded font-bold">
-                                      {languageMode === 'en' ? 'EN' : 'አማ'}
-                                    </span>
+                                    <span>{isInfo ? 'Team Leader Bulletin / Information' : 'Affected Areas & Landmarks'}</span>
+                                    {!isInfo && (
+                                      <span className="font-mono text-[9px] text-eeu-green bg-eeu-green/10 px-1.5 py-0.2 rounded font-bold">
+                                        {languageMode === 'en' ? 'EN' : 'አማ'}
+                                      </span>
+                                    )}
                                   </div>
                                   
-                                  {languageMode === 'en' ? (
-                                    <p className="font-sans text-[15.5px] text-gray-900 dark:text-gray-100 font-bold leading-relaxed">
-                                      {translateAmharicLocation(item.affectedArea)}
-                                    </p>
-                                  ) : (
-                                    <p className="font-sans text-[15.5px] text-gray-900 dark:text-gray-100 font-bold leading-relaxed">
-                                      {item.affectedArea}
-                                    </p>
-                                  )}
+                                  <p className="font-sans text-[15px] text-gray-900 dark:text-gray-100 font-medium leading-relaxed whitespace-pre-wrap">
+                                    {isInfo ? item.affectedArea : (languageMode === 'en' ? translateAmharicLocation(item.affectedArea) : item.affectedArea)}
+                                  </p>
                                 </div>
 
-                                <div className="text-xs text-gray-500 dark:text-gray-400 italic pl-3 border-l-2 border-gray-200 dark:border-gray-800">
+                                <div className={`text-xs ${isInfo ? 'text-gray-700 dark:text-gray-200 font-medium' : 'text-gray-500 dark:text-gray-400'} italic pl-3 border-l-2 ${isInfo ? 'border-amber-500 dark:border-amber-400' : 'border-gray-200 dark:border-gray-800'}`}>
                                   &ldquo;{item.remark}&rdquo;
                                 </div>
                               </div>
@@ -1265,13 +1312,15 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
                                   </div>
                                   <div className="text-xs font-medium text-gray-700 dark:text-gray-300 font-sans space-y-1">
                                     <div className="flex justify-between lg:justify-end gap-3">
-                                      <span className="text-gray-400">Start Time:</span>
+                                      <span className="text-gray-400">{isInfo ? 'Posted Time:' : 'Start Time:'}</span>
                                       <span className="text-gray-800 dark:text-gray-300">{item.startTime}</span>
                                     </div>
-                                    {isPlannedOrOperational(item.type) && item.estimatedRestorationTime && item.estimatedRestorationTime !== 'N/A' && (
+                                    {!isInfo && isPlannedOrOperational(item.type) && item.estimatedRestorationTime && item.estimatedRestorationTime !== 'N/A' && (
                                       <div className="flex justify-between lg:justify-end gap-3">
-                                        <span className="text-gray-400">Est. Restore:</span>
-                                        <span className="text-eeu-green font-semibold">{item.estimatedRestorationTime}</span>
+                                        <span className="text-gray-400">Est. Restored:</span>
+                                        <span className="text-eeu-green font-semibold">
+                                          {item.estimatedRestorationTime}
+                                        </span>
                                       </div>
                                     )}
                                   </div>
@@ -1294,7 +1343,15 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
             return (
               <div id="outages-grid-grouped" className="space-y-8">
                 {directionsToRender.map((dir) => {
-                  const itemsInDir = sortedItems.filter(item => (item.direction || getCardinalDirection(item.district, item.feederName)) === dir);
+                  const itemsInDir = sortedItems
+                    .filter(item => (item.direction || getCardinalDirection(item.district, item.feederName)) === dir)
+                    .sort((a, b) => {
+                      const aIsInfo = isInfoFeeder(a.feederName);
+                      const bIsInfo = isInfoFeeder(b.feederName);
+                      if (aIsInfo && !bIsInfo) return -1;
+                      if (!aIsInfo && bIsInfo) return 1;
+                      return 0;
+                    });
                   if (itemsInDir.length === 0) return null;
 
                   return (
@@ -1303,6 +1360,7 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
                       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                         {itemsInDir.map((item) => {
                           const isRestored = item.status === InterruptionStatus.RESTORED;
+                          const isInfo = isInfoFeeder(item.feederName);
 
                           return (
                             <div
@@ -1311,6 +1369,8 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
                               className={`glass-card ${
                                 isRestored 
                                   ? 'opacity-70' 
+                                  : isInfo 
+                                  ? 'border-l-4 border-l-amber-500 bg-amber-500/[0.04] dark:bg-amber-950/20 ring-1 ring-amber-500/30 shadow-md' 
                                   : 'border-l-4 border-l-eeu-green'
                               } rounded-3xl h-full p-5 flex flex-col justify-between`}
                             >
@@ -1318,72 +1378,83 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
                                 {/* Card top bar */}
                                 <div className="flex items-start justify-between gap-3">
                                   {/* Operational badge */}
-                                  <div className="flex items-center gap-2">
-                                    <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                                      item.status === InterruptionStatus.ACTIVE
-                                        ? 'bg-red-500/10 text-red-655 dark:bg-red-955/20 dark:text-red-400'
-                                        : item.status === InterruptionStatus.UNDER_INVESTIGATION
-                                        ? 'bg-amber-500/10 text-amber-655 dark:bg-amber-955/20 dark:text-amber-400'
-                                        : 'bg-eeu-green/10 text-eeu-green'
-                                    }`}>
-                                      <span className={`w-1.5 h-1.5 rounded-full ${
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    {isInfo && (
+                                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/40 shadow-xs">
+                                        <Pin className="w-3 h-3 fill-amber-500 text-amber-600 dark:text-amber-400" />
+                                        PINNED INFO
+                                      </span>
+                                    )}
+                                    {!isInfo && (
+                                      <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
                                         item.status === InterruptionStatus.ACTIVE
-                                          ? 'bg-red-500 animate-pulse'
+                                          ? 'bg-red-500/10 text-red-655 dark:bg-red-955/20 dark:text-red-400'
                                           : item.status === InterruptionStatus.UNDER_INVESTIGATION
-                                          ? 'bg-amber-500'
-                                          : 'bg-eeu-green'
-                                      }`} />
-                                      {item.status}
-                                    </span>
+                                          ? 'bg-amber-500/10 text-amber-655 dark:bg-amber-955/20 dark:text-amber-400'
+                                          : 'bg-eeu-green/10 text-eeu-green'
+                                      }`}>
+                                        <span className={`w-1.5 h-1.5 rounded-full ${
+                                          item.status === InterruptionStatus.ACTIVE
+                                            ? 'bg-red-500 animate-pulse'
+                                            : item.status === InterruptionStatus.UNDER_INVESTIGATION
+                                            ? 'bg-amber-500'
+                                            : 'bg-eeu-green'
+                                        }`} />
+                                        {item.status}
+                                      </span>
+                                    )}
                                   </div>
                                 </div>
 
                                 {/* Feeder Name */}
                                 <div>
-                                  <h3 className="font-display font-semibold text-base text-gray-900 dark:text-white leading-tight">
-                                    {stripBrackets(item.feederName)}
+                                  <h3 className="font-display font-semibold text-base text-gray-900 dark:text-white leading-tight flex items-center gap-1.5">
+                                    {isInfo && <Info className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />}
+                                    <span>{stripBrackets(item.feederName)}</span>
                                   </h3>
-                                  <div className="pt-1.5">
-                                    <InterruptionTypeBadge type={item.type} />
-                                  </div>
-                                </div>
-
-                                {/* Affected Area details */}
-                                <div className="p-3 rounded-xl bg-gray-100/50 dark:bg-gray-950/40 border border-gray-200/50 dark:border-gray-850/60 text-xs">
-                                  <div className="font-semibold text-gray-500 dark:text-gray-450 uppercase text-[9px] tracking-wider mb-1.5 font-mono flex items-center justify-between">
-                                    <span>Affected Areas</span>
-                                    <span className="text-[8.5px] font-mono text-eeu-green font-bold">
-                                      {languageMode === 'en' ? 'EN' : 'አማ'}
-                                    </span>
-                                  </div>
-                                  
-                                  {languageMode === 'en' ? (
-                                    <p className="text-gray-900 dark:text-gray-100 font-medium leading-relaxed font-sans text-xs">
-                                      {translateAmharicLocation(item.affectedArea)}
-                                    </p>
-                                  ) : (
-                                    <p className="text-gray-850 dark:text-gray-200 leading-relaxed font-sans text-xs">
-                                      {item.affectedArea}
-                                    </p>
+                                  {!isInfo && (
+                                    <div className="pt-1.5">
+                                      <InterruptionTypeBadge type={item.type} />
+                                    </div>
                                   )}
                                 </div>
 
+                                {/* Affected Area details / Team Leader Information */}
+                                <div className={`p-3 rounded-xl ${
+                                  isInfo 
+                                    ? 'bg-amber-500/10 dark:bg-amber-950/30 border border-amber-500/30' 
+                                    : 'bg-gray-100/50 dark:bg-gray-950/40 border border-gray-200/50 dark:border-gray-850/60'
+                                } text-xs`}>
+                                  <div className="font-semibold text-gray-500 dark:text-gray-450 uppercase text-[9px] tracking-wider mb-1.5 font-mono flex items-center justify-between">
+                                    <span>{isInfo ? 'Team Leader Information' : 'Affected Areas'}</span>
+                                    {!isInfo && (
+                                      <span className="text-[8.5px] font-mono text-eeu-green font-bold">
+                                        {languageMode === 'en' ? 'EN' : 'አማ'}
+                                      </span>
+                                    )}
+                                  </div>
+                                  
+                                  <p className="text-gray-900 dark:text-gray-100 leading-relaxed font-sans text-xs whitespace-pre-wrap">
+                                    {isInfo ? item.affectedArea : (languageMode === 'en' ? translateAmharicLocation(item.affectedArea) : item.affectedArea)}
+                                  </p>
+                                </div>
+
                                 {/* Remarks details */}
-                                <div className="text-xs text-gray-650 dark:text-gray-400 leading-relaxed italic border-l-2 border-gray-300 dark:border-gray-800 pl-3">
+                                <div className={`text-xs ${isInfo ? 'text-gray-700 dark:text-gray-200 font-medium' : 'text-gray-650 dark:text-gray-400'} leading-relaxed italic border-l-2 ${isInfo ? 'border-amber-500 dark:border-amber-400' : 'border-gray-300 dark:border-gray-800'} pl-3`}>
                                   &ldquo;{item.remark}&rdquo;
                                 </div>
                               </div>
 
                               {/* Timing panel at bottom */}
                               <div className="mt-5 pt-3.5 border-t border-gray-100 dark:border-gray-800 grid grid-cols-2 gap-3 text-[11px]">
-                                <div className={(!isPlannedOrOperational(item.type) || !item.estimatedRestorationTime || item.estimatedRestorationTime === 'N/A') ? 'col-span-2' : ''}>
+                                <div className={(isInfo || !isPlannedOrOperational(item.type) || !item.estimatedRestorationTime || item.estimatedRestorationTime === 'N/A') ? 'col-span-2' : ''}>
                                   <div className="text-gray-400 dark:text-gray-500 flex items-center gap-1 font-semibold uppercase text-[9px]">
                                     <Clock className="w-3 h-3 text-gray-400" />
-                                    <span>Start Time</span>
+                                    <span>{isInfo ? 'Posted Time' : 'Start Time'}</span>
                                   </div>
                                   <span className="font-medium text-gray-700 dark:text-gray-300 block mt-0.5 font-mono">{item.startTime}</span>
                                 </div>
-                                {isPlannedOrOperational(item.type) && item.estimatedRestorationTime && item.estimatedRestorationTime !== 'N/A' && (
+                                {!isInfo && isPlannedOrOperational(item.type) && item.estimatedRestorationTime && item.estimatedRestorationTime !== 'N/A' && (
                                   <div>
                                     <div className="text-gray-400 dark:text-gray-500 flex items-center gap-1 font-semibold uppercase text-[9px]">
                                       <CalendarClock className="w-3.5 h-3.5 text-gray-400" />
@@ -1422,7 +1493,15 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
                     </thead>
                     <tbody className="divide-y divide-gray-100 dark:divide-gray-800/80 text-sm">
                       {directionsToRender.map((dir) => {
-                        const itemsInDir = sortedItems.filter(item => (item.direction || getCardinalDirection(item.district, item.feederName)) === dir);
+                        const itemsInDir = sortedItems
+                          .filter(item => (item.direction || getCardinalDirection(item.district, item.feederName)) === dir)
+                          .sort((a, b) => {
+                            const aIsInfo = isInfoFeeder(a.feederName);
+                            const bIsInfo = isInfoFeeder(b.feederName);
+                            if (aIsInfo && !bIsInfo) return -1;
+                            if (!aIsInfo && bIsInfo) return 1;
+                            return 0;
+                          });
                         if (itemsInDir.length === 0) return null;
 
                         return (
@@ -1434,26 +1513,44 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
                             </tr>
                             {itemsInDir.map((item) => {
                               const isRestored = item.status === InterruptionStatus.RESTORED;
+                              const isInfo = isInfoFeeder(item.feederName);
                               return (
                                 <tr 
                                   key={item.id} 
                                   className={`hover:bg-gray-50/35 dark:hover:bg-gray-950/20 transition-all ${
-                                    isRestored ? 'bg-gray-50/40 dark:bg-gray-950/10 opacity-70' : ''
+                                    isRestored 
+                                      ? 'bg-gray-50/40 dark:bg-gray-950/10 opacity-70' 
+                                      : isInfo 
+                                      ? 'bg-amber-500/[0.06] dark:bg-amber-950/20 border-l-4 border-l-amber-500' 
+                                      : ''
                                   }`}
                                 >
                                   <td className="py-4 px-5 font-semibold text-gray-950 dark:text-white">
-                                    {stripBrackets(item.feederName)}
+                                    <div className="flex items-center gap-2">
+                                      {isInfo && (
+                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/40 shrink-0">
+                                          <Pin className="w-2.5 h-2.5 fill-amber-500" /> PIN
+                                        </span>
+                                      )}
+                                      <span>{stripBrackets(item.feederName)}</span>
+                                    </div>
                                   </td>
                                   <td className="py-4 px-5">
-                                    <InterruptionTypeBadge type={item.type} />
+                                    {isInfo ? (
+                                      <span className="text-gray-400 dark:text-gray-500 text-xs italic font-mono">—</span>
+                                    ) : (
+                                      <InterruptionTypeBadge type={item.type} />
+                                    )}
                                   </td>
                                   <td className="py-4 px-5 text-gray-650 dark:text-gray-400 text-xs font-sans">
                                     <div className="flex flex-col gap-1.5 leading-none">
                                       <div className="flex items-center">
-                                        <span className="text-[9px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-mono w-14">Start:</span>
+                                        <span className="text-[9px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-mono w-14">
+                                          {isInfo ? 'Time:' : 'Start:'}
+                                        </span>
                                         <span className="font-sans font-medium">{item.startTime}</span>
                                       </div>
-                                      {isPlannedOrOperational(item.type) && item.estimatedRestorationTime && item.estimatedRestorationTime !== 'N/A' && (
+                                      {!isInfo && isPlannedOrOperational(item.type) && item.estimatedRestorationTime && item.estimatedRestorationTime !== 'N/A' && (
                                         <div className="flex items-center">
                                           <span className="text-[9px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-mono w-14">Est. End:</span>
                                           <span className="font-sans font-medium text-eeu-green">
@@ -1464,36 +1561,34 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
                                     </div>
                                   </td>
                                   <td className="py-4 px-5 max-w-sm">
-                                    {languageMode === 'en' ? (
-                                      <div className="text-xs text-gray-800 dark:text-gray-200 font-medium">
-                                        {translateAmharicLocation(item.affectedArea)}
-                                      </div>
-                                    ) : (
-                                      <div className="text-xs text-gray-800 dark:text-gray-200 font-medium whitespace-pre-wrap">
-                                        {item.affectedArea}
-                                      </div>
-                                    )}
+                                    <div className="text-xs text-gray-800 dark:text-gray-200 font-medium whitespace-pre-wrap">
+                                      {isInfo ? item.affectedArea : (languageMode === 'en' ? translateAmharicLocation(item.affectedArea) : item.affectedArea)}
+                                    </div>
                                     <div className="text-[10px] text-gray-400 dark:text-gray-500 italic truncate mt-1" title={item.remark}>
-                                      Remark: {item.remark}
+                                      {isInfo ? 'Note: ' : 'Remark: '}{item.remark}
                                     </div>
                                   </td>
                                   <td className="py-4 px-5">
-                                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-                                      item.status === InterruptionStatus.ACTIVE
-                                        ? 'bg-red-100/70 text-red-700 dark:bg-red-950/30 dark:text-red-400'
-                                        : item.status === InterruptionStatus.UNDER_INVESTIGATION
-                                        ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400'
-                                        : 'bg-green-100/70 text-green-700 dark:bg-green-950/30 dark:text-green-400'
-                                    }`}>
-                                      <span className={`w-1.5 h-1.5 rounded-full ${
+                                    {isInfo ? (
+                                      <span className="text-gray-400 dark:text-gray-500 text-xs italic font-mono">—</span>
+                                    ) : (
+                                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold ${
                                         item.status === InterruptionStatus.ACTIVE
-                                          ? 'bg-red-500'
+                                          ? 'bg-red-100/70 text-red-700 dark:bg-red-950/30 dark:text-red-400'
                                           : item.status === InterruptionStatus.UNDER_INVESTIGATION
-                                          ? 'bg-amber-500 animate-pulse'
-                                          : 'bg-green-500'
-                                      }`} />
-                                      {item.status}
-                                    </span>
+                                          ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400'
+                                          : 'bg-green-100/70 text-green-700 dark:bg-green-950/30 dark:text-green-400'
+                                      }`}>
+                                        <span className={`w-1.5 h-1.5 rounded-full ${
+                                          item.status === InterruptionStatus.ACTIVE
+                                            ? 'bg-red-500'
+                                            : item.status === InterruptionStatus.UNDER_INVESTIGATION
+                                            ? 'bg-amber-500 animate-pulse'
+                                            : 'bg-green-500'
+                                        }`} />
+                                        {item.status}
+                                      </span>
+                                    )}
                                   </td>
                                 </tr>
                               );

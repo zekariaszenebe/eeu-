@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { 
   ShieldAlert, Lock, Unlock, Plus, Edit3, CheckCircle2, Trash2, X, AlertCircle, 
   RefreshCw, Info, MapPin, Zap, Clock, ShieldCheck, HelpCircle, Download, Copy, Check, Building,
-  UserCheck, Users, Eye, EyeOff, UserPlus, KeyRound, Shield, Search
+  UserCheck, Users, Eye, EyeOff, UserPlus, KeyRound, Shield, Search, Pin
 } from 'lucide-react';
-import { FeederInterruption, InterruptionType, InterruptionStatus, stripBrackets, TeamLeaderUser, UserRole, normalizeInterruptionType, isPlannedOrOperational, isFeederRestored } from '../types';
+import { FeederInterruption, InterruptionType, InterruptionStatus, stripBrackets, TeamLeaderUser, UserRole, normalizeInterruptionType, isPlannedOrOperational, isFeederRestored, isInfoFeeder } from '../types';
 import { INITIAL_DISTRICTS, INITIAL_FEEDERS_LIST } from '../data/mockData';
 import { InterruptionTypeBadge, getCardinalDirection } from './AgentView';
 import { LanguageMode, translateAmharicLocation, formatLocationDisplay } from '../utils/locationLanguage';
@@ -50,6 +50,9 @@ export const normalizeFeederName = (name: string) => {
 export const parseFeederDetails = (feederLine: string) => {
   try {
     if (!feederLine) return { substation: 'N/A', feederId: '' };
+    if (isInfoFeeder(feederLine)) {
+      return { substation: 'INFO', feederId: 'BULLETIN' };
+    }
     const parts = feederLine.split(' - ');
     if (parts.length >= 2) {
       const substation = parts[0].trim();
@@ -474,10 +477,12 @@ export default function AdminPanel({
       return;
     }
 
-    // Validate: Do not allow adding or updating an interruption to the same feeder if an active/unrestored log already exists
+    // Validate: Do not allow adding or updating an interruption to the same feeder if an active/unrestored log already exists (exempt INFO bulletins)
     const normFinal = normalizeFeederName(finalFeederName);
+    const isInfo = isInfoFeeder(finalFeederName) || normFinal === 'info';
     const existingUnrestored = interruptions.find((item) => {
       if (editingItem && item.id === editingItem.id) return false;
+      if (isInfo) return false;
       const isSameFeeder = normalizeFeederName(item.feederName) === normFinal;
       const isNotRestored = item.status !== InterruptionStatus.RESTORED;
       return isSameFeeder && isNotRestored;
@@ -489,16 +494,16 @@ export default function AdminPanel({
     }
     
     if (!affectedArea.trim()) {
-      setFormError('Please describe the affected community areas.');
+      setFormError(isInfo ? 'Please type the information you want to share.' : 'Please describe the affected community areas.');
       return;
     }
 
     if (!remark.trim()) {
-      setFormError('Please provide a status or action log remark.');
+      setFormError(isInfo ? 'Please provide a technical remark or note.' : 'Please provide a status or action log remark.');
       return;
     }
 
-    const finalEstimatedRestoration = isPlannedOrOperational(type)
+    const finalEstimatedRestoration = (!isInfo && isPlannedOrOperational(type))
       ? (estimatedRestoration.trim() || 'N/A')
       : 'N/A';
 
@@ -512,7 +517,7 @@ export default function AdminPanel({
       feederName: finalFeederName,
       district: finalDistrict,
       direction: finalDirection,
-      type: normalizeInterruptionType(type),
+      type: isInfo ? InterruptionType.OPERATIONAL_INTERRUPTION : normalizeInterruptionType(type),
       status,
       startTime,
       estimatedRestorationTime: finalEstimatedRestoration,
@@ -725,10 +730,14 @@ export default function AdminPanel({
     }
   };
 
-  // Sort interruptions: Active disruptions only (restored feeders live in the Restored Feeders archive tab)
+  // Sort interruptions: Active disruptions only, with pinned INFO bulletins first
   const sortedInterruptions = [...interruptions]
     .filter(item => !isFeederRestored(item))
     .sort((a, b) => {
+      const aIsInfo = isInfoFeeder(a.feederName);
+      const bIsInfo = isInfoFeeder(b.feederName);
+      if (aIsInfo && !bIsInfo) return -1;
+      if (!aIsInfo && bIsInfo) return 1;
       // Within active outages, sort by lastUpdated descending (newest first)
       return (b.lastUpdated || '').localeCompare(a.lastUpdated || '');
     });
@@ -928,27 +937,41 @@ export default function AdminPanel({
               <tbody className="divide-y divide-gray-100 dark:divide-gray-800/60 text-sm">
                 {sortedInterruptions.map((item) => {
                   const isRestored = isFeederRestored(item);
-                  return (
-                    <tr 
-                      key={item.id} 
-                      className={`hover:bg-gray-50/40 dark:hover:bg-gray-950/20 transition-all ${
-                        isRestored ? 'bg-gray-50/20 dark:bg-gray-950/10 opacity-70' : ''
-                      }`}
-                    >
-                      {/* Name & Sub details */}
-                      <td className="py-4 px-5">
-                        <div className="font-semibold text-gray-900 dark:text-white">
-                          {stripBrackets(item.feederName)}
-                        </div>
-                        <div className="text-[11px] font-mono text-gray-500 dark:text-gray-400 flex items-center gap-1.5 mt-1">
-                          <Clock className="w-3 h-3" />
-                          <span>Started: {item.startTime}</span>
-                        </div>
-                      </td>
+                      const isInfo = isInfoFeeder(item.feederName);
+                      return (
+                        <tr 
+                          key={item.id} 
+                          className={`hover:bg-gray-50/40 dark:hover:bg-gray-950/20 transition-all ${
+                            isRestored 
+                              ? 'bg-gray-50/20 dark:bg-gray-950/10 opacity-70' 
+                              : isInfo 
+                              ? 'bg-amber-500/[0.06] dark:bg-amber-950/20 border-l-4 border-l-amber-500' 
+                              : ''
+                          }`}
+                        >
+                          {/* Name & Sub details */}
+                          <td className="py-4 px-5">
+                            <div className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                              {isInfo && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/40">
+                                  <Pin className="w-2.5 h-2.5 fill-amber-500" /> PINNED INFO
+                                </span>
+                              )}
+                              <span>{stripBrackets(item.feederName)}</span>
+                            </div>
+                            <div className="text-[11px] font-mono text-gray-500 dark:text-gray-400 flex items-center gap-1.5 mt-1">
+                              <Clock className="w-3 h-3" />
+                              <span>Started: {item.startTime}</span>
+                            </div>
+                          </td>
 
                       {/* Outage Type */}
                       <td className="py-4 px-5">
-                        <InterruptionTypeBadge type={item.type} />
+                        {isInfo ? (
+                          <span className="text-gray-400 dark:text-gray-500 text-xs italic font-mono">—</span>
+                        ) : (
+                          <InterruptionTypeBadge type={item.type} />
+                        )}
                       </td>
 
                       {/* Cardinal Direction */}
@@ -963,31 +986,37 @@ export default function AdminPanel({
 
                       {/* Status Badges */}
                       <td className="py-4 px-5">
-                        <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-                          item.status === InterruptionStatus.ACTIVE
-                            ? 'bg-red-100/80 text-red-700 dark:bg-red-950/30 dark:text-red-400'
-                            : item.status === InterruptionStatus.UNDER_INVESTIGATION
-                            ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400'
-                            : 'bg-green-100/80 text-green-700 dark:bg-green-950/30 dark:text-green-400'
-                        }`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${
+                        {isInfo ? (
+                          <span className="text-gray-400 dark:text-gray-500 text-xs italic font-mono">—</span>
+                        ) : (
+                          <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold ${
                             item.status === InterruptionStatus.ACTIVE
-                              ? 'bg-red-500 animate-pulse'
+                              ? 'bg-red-100/80 text-red-700 dark:bg-red-950/30 dark:text-red-400'
                               : item.status === InterruptionStatus.UNDER_INVESTIGATION
-                              ? 'bg-amber-500 animate-pulse'
-                              : 'bg-green-500'
-                          }`} />
-                          {item.status}
-                        </span>
+                              ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400'
+                              : 'bg-green-100/80 text-green-700 dark:bg-green-950/30 dark:text-green-400'
+                          }`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${
+                              item.status === InterruptionStatus.ACTIVE
+                                ? 'bg-red-500 animate-pulse'
+                                : item.status === InterruptionStatus.UNDER_INVESTIGATION
+                                ? 'bg-amber-500 animate-pulse'
+                                : 'bg-green-500'
+                            }`} />
+                            {item.status}
+                          </span>
+                        )}
                         
                         <div className="text-[11px] text-gray-400 dark:text-gray-500 font-medium italic mt-1 max-w-[180px] truncate" title={item.remark}>
                           {item.remark}
                         </div>
                       </td>
 
-                      {/* Affected Area snippet */}
+                      {/* Affected Area / Information snippet */}
                       <td className="py-4 px-5">
-                        <div className="text-xs text-gray-600 dark:text-gray-300 max-w-[220px] line-clamp-2">
+                        <div className={`text-xs max-w-[240px] line-clamp-3 whitespace-pre-wrap ${
+                          isInfo ? 'text-amber-800 dark:text-amber-300 font-medium' : 'text-gray-600 dark:text-gray-300'
+                        }`}>
                           {item.affectedArea}
                         </div>
                       </td>
@@ -1382,6 +1411,10 @@ export default function AdminPanel({
             </div>
 
             {/* Modal Body / Form */}
+            {(() => {
+              const isSelectedFeederInfo = isInfoFeeder(customFeederEnabled ? customFeederName : feederName);
+
+              return (
             <form onSubmit={handleFormSubmit} className="p-6 space-y-4">
               {formError && (
                 <div className="p-4 bg-red-100/70 dark:bg-red-950/20 border border-red-200 dark:border-red-900 text-red-650 dark:text-red-400 rounded-2xl text-xs flex items-center gap-2">
@@ -1437,7 +1470,11 @@ export default function AdminPanel({
                               if (match) {
                                 const parsed = parseFeeder(match);
                                 setFeederName(parsed.feederLine);
-                                if (parsed.amharicLocation) {
+                                if (isInfoFeeder(parsed.feederLine)) {
+                                  if (!editingItem) {
+                                    setAffectedArea('');
+                                  }
+                                } else if (parsed.amharicLocation) {
                                   setAffectedArea(parsed.amharicLocation);
                                 }
                               }
@@ -1493,7 +1530,8 @@ export default function AdminPanel({
                             return matches.map((feeder) => {
                               const parsed = parseFeeder(feeder);
                               const norm = normalizeFeederName(parsed.feederLine);
-                              const activeItem = interruptions.find(
+                              const isFeederInfo = isInfoFeeder(parsed.feederLine) || norm === 'info';
+                              const activeItem = isFeederInfo ? null : interruptions.find(
                                 (item) =>
                                   (!editingItem || item.id !== editingItem.id) &&
                                   normalizeFeederName(item.feederName) === norm &&
@@ -1511,8 +1549,14 @@ export default function AdminPanel({
                                     setFormFeederSearchQuery(parsed.feederLine);
                                     setFormFeederDropdownOpen(false);
 
-                                    // Auto fill Affected Communities / Areas
-                                    setAffectedArea(parsed.amharicLocation);
+                                    // Auto fill Affected Communities / Areas (for INFO, allow team leader to type)
+                                    if (isInfoFeeder(parsed.feederLine)) {
+                                      if (!editingItem) {
+                                        setAffectedArea('');
+                                      }
+                                    } else {
+                                      setAffectedArea(parsed.amharicLocation);
+                                    }
                                     setDirection(parsed.direction || getCardinalDirection(district, parsed.feederLine));
                                   }}
                                   className={`w-full text-left px-3.5 py-2 text-xs transition-colors flex items-center justify-between gap-2 ${
@@ -1586,58 +1630,60 @@ export default function AdminPanel({
               </div>
 
               {/* Type and Status */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase font-mono tracking-wider mb-1.5">
-                    Interruption Cause Type
-                  </label>
-                  <select
-                    id="form-type-select"
-                    value={type}
-                    onChange={(e) => {
-                      const newType = e.target.value as InterruptionType;
-                      setType(newType);
-                      if (isPlannedOrOperational(newType) && !estimatedRestoration) {
-                        const future = new Date(Date.now() + 3 * 60 * 60 * 1000);
-                        setEstimatedRestoration(future.toLocaleString('en-US', {
-                          month: 'short',
-                          day: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                          hour12: true
-                        }));
-                      }
-                    }}
-                    className="w-full text-xs rounded-xl glass-input p-2.5 text-gray-900 dark:text-white focus:outline-none focus:ring-1.5 focus:ring-eeu-green"
-                  >
-                    {Object.values(InterruptionType).map((t) => (
-                      <option key={t} value={t}>{t}</option>
-                    ))}
-                  </select>
-                </div>
+              {!isSelectedFeederInfo && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase font-mono tracking-wider mb-1.5">
+                      Interruption Cause Type
+                    </label>
+                    <select
+                      id="form-type-select"
+                      value={type}
+                      onChange={(e) => {
+                        const newType = e.target.value as InterruptionType;
+                        setType(newType);
+                        if (isPlannedOrOperational(newType) && !estimatedRestoration) {
+                          const future = new Date(Date.now() + 3 * 60 * 60 * 1000);
+                          setEstimatedRestoration(future.toLocaleString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            hour12: true
+                          }));
+                        }
+                      }}
+                      className="w-full text-xs rounded-xl glass-input p-2.5 text-gray-900 dark:text-white focus:outline-none focus:ring-1.5 focus:ring-eeu-green"
+                    >
+                      {Object.values(InterruptionType).map((t) => (
+                        <option key={t} value={t}>{t}</option>
+                      ))}
+                    </select>
+                  </div>
 
-                <div>
-                  <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase font-mono tracking-wider mb-1.5">
-                    Current Restoration Status
-                  </label>
-                  <select
-                    id="form-status-select"
-                    value={status}
-                    onChange={(e) => setStatus(e.target.value as InterruptionStatus)}
-                    className="w-full text-xs rounded-xl glass-input p-2.5 text-gray-900 dark:text-white focus:outline-none focus:ring-1.5 focus:ring-eeu-green"
-                  >
-                    {[InterruptionStatus.ACTIVE, InterruptionStatus.UNDER_INVESTIGATION].map((s) => (
-                      <option key={s} value={s}>{s}</option>
-                    ))}
-                  </select>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase font-mono tracking-wider mb-1.5">
+                      Current Restoration Status
+                    </label>
+                    <select
+                      id="form-status-select"
+                      value={status}
+                      onChange={(e) => setStatus(e.target.value as InterruptionStatus)}
+                      className="w-full text-xs rounded-xl glass-input p-2.5 text-gray-900 dark:text-white focus:outline-none focus:ring-1.5 focus:ring-eeu-green"
+                    >
+                      {[InterruptionStatus.ACTIVE, InterruptionStatus.UNDER_INVESTIGATION].map((s) => (
+                        <option key={s} value={s}>{s}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Timing */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className={!isPlannedOrOperational(type) ? 'sm:col-span-2' : ''}>
+                <div className={isSelectedFeederInfo || !isPlannedOrOperational(type) ? 'sm:col-span-2' : ''}>
                   <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase font-mono tracking-wider mb-1.5">
-                    Interruption Start Time
+                    {isSelectedFeederInfo ? 'Announcement / Posting Time' : 'Interruption Start Time'}
                   </label>
                   <input
                     id="form-startTime-input"
@@ -1649,7 +1695,7 @@ export default function AdminPanel({
                   />
                 </div>
 
-                {isPlannedOrOperational(type) && (
+                {!isSelectedFeederInfo && isPlannedOrOperational(type) && (
                   <div>
                     <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase font-mono tracking-wider mb-1.5">
                       Estimated Restoration Time
@@ -1666,13 +1712,17 @@ export default function AdminPanel({
                 )}
               </div>
 
-              {/* Affected Areas */}
+              {/* Affected Areas / Team Leader Information */}
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase font-mono tracking-wider">
-                    Affected Communities & Landmark Areas
+                    {isSelectedFeederInfo ? 'Information / Announcement Content (መረጃ / ማሳሰቢያ)' : 'Affected Communities & Landmark Areas'}
                   </label>
-                  {affectedArea && (
+                  {isSelectedFeederInfo ? (
+                    <span className="text-[10px] text-amber-600 dark:text-amber-400 font-mono font-semibold">
+                      Team Leader Info Mode
+                    </span>
+                  ) : affectedArea && (
                     <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-mono font-semibold">
                       Auto-Bilingual Support Active
                     </span>
@@ -1680,13 +1730,17 @@ export default function AdminPanel({
                 </div>
                 <textarea
                   id="form-affected-textarea"
-                  rows={2}
+                  rows={isSelectedFeederInfo ? 4 : 2}
                   value={affectedArea}
                   onChange={(e) => setAffectedArea(e.target.value)}
-                  placeholder="List neighborhoods, landmark buildings, or streets disconnected (in Amharic or English, separated by commas)"
+                  placeholder={
+                    isSelectedFeederInfo
+                      ? "Type the information, announcement, or operational update to share here (ማጋራት የሚፈልጉትን መረጃ ወይም ማሳሰቢያ እዚህ ይፃፉ)..."
+                      : "List neighborhoods, landmark buildings, or streets disconnected (in Amharic or English, separated by commas)"
+                  }
                   className="w-full text-xs rounded-xl glass-input p-2.5 text-gray-900 dark:text-white focus:outline-none focus:ring-1.5 focus:ring-eeu-green leading-relaxed text-left"
                 />
-                {affectedArea && (
+                {!isSelectedFeederInfo && affectedArea && (
                   <div className="mt-1.5 p-2 bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200/50 dark:border-emerald-900/40 rounded-xl text-left">
                     <div className="text-[9px] font-mono font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider mb-0.5">
                       English Spelling Preview:
@@ -1732,6 +1786,8 @@ export default function AdminPanel({
                 </button>
               </div>
             </form>
+              );
+            })()}
           </div>
         </div>
       )}

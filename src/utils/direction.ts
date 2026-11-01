@@ -78,6 +78,7 @@ export function getCardinalDirection(district: string, feederName?: string): Dir
 
   // East list
   if (
+    fUpper === 'INFO' || fUpper.startsWith('INFO') ||
     f.includes('ADE-01') || f.includes('ADE-02') || f.includes('ADE-03') || f.includes('ADE-04') || f.includes('ADE-05') || f.includes('ADE-07') || f.includes('ADE-09') || f.includes('ADE-11') || f.includes('ADE-12') ||
     f.includes('ARB-') ||
     f.includes('AYT-') ||

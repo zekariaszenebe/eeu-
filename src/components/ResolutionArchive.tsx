@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { History, ShieldCheck, CheckSquare, Search, Award, MapPin, Calendar, Compass, ShieldOff, Languages, Trash2 } from 'lucide-react';
-import { FeederInterruption, stripBrackets, isFeederRestored } from '../types';
+import { History, ShieldCheck, CheckSquare, Search, Award, MapPin, Calendar, Compass, ShieldOff, Languages, Trash2, Pin } from 'lucide-react';
+import { FeederInterruption, stripBrackets, isFeederRestored, isInfoFeeder } from '../types';
 import { translateAmharicLocation } from '../utils/locationLanguage';
 import { InterruptionTypeBadge } from './AgentView';
 import { useInterruptions } from '../context/InterruptionContext';
@@ -94,7 +94,9 @@ export default function ResolutionArchive({ interruptions }: ResolutionArchivePr
         </div>
       ) : (
         <div id="archive-grid" className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {restoredItems.map((item) => (
+          {restoredItems.map((item) => {
+            const isInfo = isInfoFeeder(item.feederName);
+            return (
             <div
               id={`archive-item-${item.id}`}
               key={item.id}
@@ -102,11 +104,18 @@ export default function ResolutionArchive({ interruptions }: ResolutionArchivePr
             >
               <div className="space-y-2">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-[10px] font-mono font-bold bg-eeu-green/10 text-eeu-green px-2 py-0.5 rounded-full uppercase">
-                    RESOLVED & SUCCESSFUL
-                  </span>
+                  {isInfo ? (
+                    <span className="text-[10px] font-mono font-bold bg-amber-500/10 text-amber-700 dark:text-amber-300 px-2 py-0.5 rounded-full uppercase flex items-center gap-1">
+                      <Pin className="w-2.5 h-2.5 fill-amber-500" />
+                      ARCHIVED INFO
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-mono font-bold bg-eeu-green/10 text-eeu-green px-2 py-0.5 rounded-full uppercase">
+                      RESOLVED & SUCCESSFUL
+                    </span>
+                  )}
                   <div className="flex items-center gap-1.5">
-                    <InterruptionTypeBadge type={item.type} />
+                    {!isInfo && <InterruptionTypeBadge type={item.type} />}
                     <button
                       onClick={() => deleteInterruption(item.id)}
                       className="p-1 text-gray-400 hover:text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 transition-all cursor-pointer"
@@ -146,7 +155,8 @@ export default function ResolutionArchive({ interruptions }: ResolutionArchivePr
                 </div>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
 

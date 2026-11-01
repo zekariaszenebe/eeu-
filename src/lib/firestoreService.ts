@@ -148,8 +148,13 @@ export async function seedInitialDataIfEmpty() {
   const SEED_STORAGE_KEY = 'eeu-local-seeded-v3';
   
   // Ensure local storage has baseline datasets ready
-  if (!getLocal<string[] | null>('eeu-feeders-list-v4', null)) {
+  const cachedFeeders = getLocal<string[] | null>('eeu-feeders-list-v4', null);
+  if (!cachedFeeders) {
     setLocal('eeu-feeders-list-v4', INITIAL_FEEDERS_LIST);
+    setLocal('eeu-feeders-version', FEEDERS_VERSION);
+  } else if (!cachedFeeders.some(f => f.startsWith('INFO'))) {
+    const updated = ['INFO (የመረጃ እና ማሳሰቢያ ማጋሪያ / General Information & Updates) | East', ...cachedFeeders];
+    setLocal('eeu-feeders-list-v4', updated);
     setLocal('eeu-feeders-version', FEEDERS_VERSION);
   }
 
@@ -342,15 +347,22 @@ export async function fetchFeedersList(): Promise<string[]> {
     if (snap.exists()) {
       const data = snap.data();
       if (Array.isArray(data.list) && data.list.length > 0) {
-        const sorted = [...data.list].sort();
-        setLocal('eeu-feeders-list-v4', sorted);
-        return sorted;
+        let list = [...data.list];
+        if (!list.some(f => f.startsWith('INFO'))) {
+          list = ['INFO (የመረጃ እና ማሳሰቢያ ማጋሪያ / General Information & Updates) | East', ...list];
+        }
+        setLocal('eeu-feeders-list-v4', list);
+        return list;
       }
     }
   } catch (err) {
     handleFirestoreError(err, OperationType.GET, 'systemSettings/presetFeeders');
   }
-  return getLocal<string[]>('eeu-feeders-list-v4', INITIAL_FEEDERS_LIST);
+  const fallback = getLocal<string[]>('eeu-feeders-list-v4', INITIAL_FEEDERS_LIST);
+  if (!fallback.some(f => f.startsWith('INFO'))) {
+    return ['INFO (የመረጃ እና ማሳሰቢያ ማጋሪያ / General Information & Updates) | East', ...fallback];
+  }
+  return fallback;
 }
 
 /**
