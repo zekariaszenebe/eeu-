@@ -1293,7 +1293,7 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
                                     )}
                                   </div>
                                   
-                                  <p className="font-sans text-[15px] text-gray-900 dark:text-gray-100 font-medium leading-relaxed whitespace-pre-wrap">
+                                  <p className="font-sans text-[15px] text-gray-900 dark:text-gray-100 font-bold leading-relaxed whitespace-pre-wrap">
                                     {isInfo ? item.affectedArea : (languageMode === 'en' ? translateAmharicLocation(item.affectedArea) : item.affectedArea)}
                                   </p>
                                 </div>
