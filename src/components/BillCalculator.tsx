@@ -159,7 +159,7 @@ export default function BillCalculator() {
   const [category, setCategory] = useState<'domestic' | 'commercial'>('domestic');
   const [connectionType, setConnectionType] = useState<'postpaid' | 'prepaid'>('postpaid');
   const [year, setYear] = useState<'2017' | '2018' | '2019' | '2020'>('2019');
-  const [quarter, setQuarter] = useState<'1' | '2' | '3' | '4'>('1');
+  const [quarter, setQuarter] = useState<'1' | '2' | '3' | '4'>('2');
   const [ethiopianMonth, setEthiopianMonth] = useState<string>('Custom / Standard Cycle');
   const [billDays, setBillDays] = useState<number>(30);
   const [inputMode, setInputMode] = useState<'direct' | 'readings'>('direct');
