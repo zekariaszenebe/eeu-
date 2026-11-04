@@ -569,7 +569,8 @@ export default function SMSTickerGenerator() {
                     setTokenInput(cleaned);
                   }}
                   placeholder="Enter Token Number"
-                  className="w-full pl-4 pr-10 py-2.5 rounded-xl text-sm font-mono tracking-wide bg-white dark:bg-zinc-900 border border-gray-250 dark:border-zinc-800 text-gray-900 dark:text-white placeholder:text-gray-400 placeholder:font-sans focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all"
+                  className="w-full pl-4 pr-10 py-2.5 rounded-xl text-sm font-sans tracking-wide bg-white dark:bg-zinc-900 border border-gray-250 dark:border-zinc-800 text-gray-900 dark:text-white placeholder:text-gray-400 placeholder:font-sans focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all"
+                  style={{ fontFamily: 'Inter, sans-serif' }}
                 />
                 {isTokenEntered && (
                   <button
