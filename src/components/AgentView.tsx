@@ -6,9 +6,10 @@ import {
   Columns, Rows, Zap, Settings, Compass, ArrowUp, ArrowDown, ArrowLeft, ArrowRight,
   Trash2, Edit3, Plus, MessageSquare, AlertCircle, Languages,
   Undo, Redo, Bold, Italic, Underline, Strikethrough, AlignLeft, AlignCenter, AlignRight, AlignJustify, Table, ChevronDown,
-  Activity, Gauge, PowerOff, Server, Pin
+  Activity, Gauge, PowerOff, Server, Pin, RefreshCw
 } from 'lucide-react';
-import { FeederInterruption, InterruptionType, InterruptionStatus, normalizeInterruptionType, stripBrackets, TeamLeaderNote, isPlannedOrOperational, isFeederRestored, isInfoFeeder } from '../types';
+import { useInterruptions } from '../context/InterruptionContext';
+import { FeederInterruption, InterruptionType, InterruptionStatus, normalizeInterruptionType, stripBrackets, TeamLeaderNote, isPlannedOrOperational, isFeederRestored, isInfoFeeder, isOutageFromToday } from '../types';
 import { INITIAL_DISTRICTS } from '../data/mockData';
 import { INITIAL_FEEDERS_LIST } from '../data/feedersList';
 import { addTeamLeaderNoteDoc, updateTeamLeaderNoteDoc, deleteTeamLeaderNoteDoc } from '../lib/firestoreService';
@@ -210,6 +211,18 @@ interface AgentViewProps {
 }
 
 export default function AgentView({ interruptions, onTriggerMockIncident, isAdmin = false, teamLeaderNotes = [] }: AgentViewProps) {
+  const { refreshInterruptions, isCloudSyncActive } = useInterruptions();
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  const handleManualSync = async () => {
+    setIsSyncing(true);
+    try {
+      await refreshInterruptions();
+    } finally {
+      setTimeout(() => setIsSyncing(false), 600);
+    }
+  };
+
   // Direct state from the single root InterruptionContext subscription (eliminates duplicate Firestore reads)
   const liveInterruptions = interruptions || [];
 
@@ -220,6 +233,7 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
   const [selectedDirection, setSelectedDirection] = useState<string>('All');
   const [showOnlyActive, setShowOnlyActive] = useState(true);
   const [sortBy, setSortBy] = useState<'latest' | 'oldest' | 'name'>('latest');
+  const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'previous'>('all');
   const [languageMode, setLanguageMode] = useState<LanguageMode>('am');
 
   // Affected Location Area Directory state controls
@@ -715,8 +729,18 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
     const itemDir = item.direction || getCardinalDirection(item.district, item.feederName);
     const matchesDirection = selectedDirection === 'All' || itemDir === selectedDirection;
 
-    return matchesSearch && matchesDistrict && matchesType && matchesDirection;
+    // 5. Date Filter Match
+    const isToday = isOutageFromToday(item.startTime);
+    const matchesDate = dateFilter === 'all' || 
+      (dateFilter === 'today' && isToday) || 
+      (dateFilter === 'previous' && !isToday);
+
+    return matchesSearch && matchesDistrict && matchesType && matchesDirection && matchesDate;
   });
+
+  const activeNonRestored = displayInterruptions.filter(item => !isFeederRestored(item));
+  const previousDaysCount = activeNonRestored.filter(item => !isOutageFromToday(item.startTime)).length;
+  const todayOutagesCount = activeNonRestored.filter(item => isOutageFromToday(item.startTime)).length;
 
   // Process Sorting: Pinned INFO bulletins always stay first at the top
   const sortedItems = [...filteredItems].sort((a, b) => {
@@ -867,9 +891,28 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
       
       {/* Filters Drawer */}
       <div className="glass-card rounded-3xl px-6 py-5 order-2">
+        {/* Previous Days Outage Awareness Banner */}
+        {previousDaysCount > 0 && (
+          <div className="mb-4 p-3 rounded-2xl bg-amber-500/10 border border-amber-500/25 flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-2 text-xs text-amber-900 dark:text-amber-200">
+              <CalendarClock className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+              <span>
+                <strong>{previousDaysCount} active outage(s)</strong> were reported on previous days.
+              </span>
+            </div>
+            <button
+              id="filter-today-toggle-btn"
+              onClick={() => setDateFilter(dateFilter === 'today' ? 'all' : 'today')}
+              className="text-[11px] font-bold px-3 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-800 dark:text-amber-300 transition-all cursor-pointer"
+            >
+              {dateFilter === 'today' ? `Show All Outages (${activeNonRestored.length})` : `Show Today Only (${todayOutagesCount})`}
+            </button>
+          </div>
+        )}
+
         {/* Filters and sorting row */}
         <div className="flex items-center justify-between gap-6 flex-wrap">
-          <div className="flex-1 min-w-[280px] grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="flex-1 min-w-[280px] grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {/* Direction Filter */}
             <div className="flex items-center gap-2 w-full">
               <span className="text-xs font-sans text-gray-500 dark:text-gray-400 whitespace-nowrap">Direction:</span>
@@ -901,6 +944,21 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
                 {Object.values(InterruptionType).map((t) => (
                   <option key={t} value={t}>{t}</option>
                 ))}
+              </select>
+            </div>
+
+            {/* Date / Timeframe Filter */}
+            <div className="flex items-center gap-2 w-full">
+              <span className="text-xs font-sans text-gray-500 dark:text-gray-400 whitespace-nowrap">Date:</span>
+              <select
+                id="filter-date"
+                value={dateFilter}
+                onChange={(e) => setDateFilter(e.target.value as any)}
+                className="text-xs rounded-xl border border-gray-200 dark:border-gray-800 p-2 bg-gray-50 dark:bg-gray-900 text-gray-700 dark:text-gray-300 font-medium focus:outline-none focus:ring-1.5 focus:ring-eeu-green w-full"
+              >
+                <option value="all">All Dates ({activeNonRestored.length})</option>
+                <option value="today">Today Only ({todayOutagesCount})</option>
+                <option value="previous">Past Days ({previousDaysCount})</option>
               </select>
             </div>
 
@@ -985,6 +1043,22 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
                 <List className="w-4 h-4" />
               </button>
             </div>
+
+            {/* Sync Live Interruptions Button */}
+            <button
+              id="sync-live-outages-btn"
+              onClick={handleManualSync}
+              disabled={isSyncing}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer shadow-xs ${
+                isSyncing 
+                  ? 'bg-eeu-green/10 border-eeu-green text-eeu-green' 
+                  : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800 text-gray-700 dark:text-gray-300 hover:text-eeu-green dark:hover:text-eeu-green hover:border-eeu-green/40'
+              }`}
+              title="Sync live interruptions directly from cloud database"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin text-eeu-green' : isCloudSyncActive ? 'text-eeu-green' : 'text-amber-500'}`} />
+              <span className="hidden sm:inline">{isSyncing ? 'Syncing...' : 'Sync Live'}</span>
+            </button>
           </div>
         </div>
       </div>

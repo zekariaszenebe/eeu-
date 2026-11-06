@@ -2,6 +2,7 @@ import {
   collection, 
   doc, 
   getDoc,
+  getDocFromServer,
   setDoc, 
   updateDoc, 
   deleteDoc, 
@@ -321,7 +322,12 @@ export function subscribeToInterruptions(onUpdate: (items: FeederInterruption[])
 export async function fetchLatestInterruptions(): Promise<FeederInterruption[]> {
   try {
     const liveDocRef = doc(db, 'systemSettings', 'liveInterruptions');
-    const snap = await getDoc(liveDocRef);
+    let snap;
+    try {
+      snap = await getDocFromServer(liveDocRef);
+    } catch {
+      snap = await getDoc(liveDocRef);
+    }
 
     if (snap.exists()) {
       const data = snap.data();
@@ -536,8 +542,8 @@ export async function addInterruptionDoc(entry: Omit<FeederInterruption, 'id' | 
     return { record, syncedToCloud: false, quotaExhausted: true };
   }
 
-  // Queue debounced cloud write (avoids duplicate bursts)
-  queueOutagesWriteToCloud(updatedList, timestampStr, false);
+  // Flush immediate cloud write so all terminals sync instantly
+  queueOutagesWriteToCloud(updatedList, timestampStr, true);
   return { record, syncedToCloud: true, quotaExhausted: false };
 }
 
@@ -593,8 +599,8 @@ export async function updateInterruptionDoc(id: string, entry: Partial<FeederInt
     return { record: merged, syncedToCloud: false, quotaExhausted: true };
   }
 
-  // Queue debounced cloud write (avoids duplicate bursts on rapid edits)
-  queueOutagesWriteToCloud(updatedList, timestampStr, false);
+  // Flush immediate cloud write so all terminals sync instantly
+  queueOutagesWriteToCloud(updatedList, timestampStr, true);
   return { record: merged, syncedToCloud: true, quotaExhausted: false };
 }
 

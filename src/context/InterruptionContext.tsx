@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { FeederInterruption, InterruptionStatus, normalizeInterruptionType, isFeederRestored } from '../types';
+import { FeederInterruption, InterruptionStatus, normalizeInterruptionType, isFeederRestored, isOutageFromToday } from '../types';
 import { getCardinalDirection } from '../utils/direction';
 import { 
   addInterruptionDoc, 
@@ -12,7 +12,8 @@ import {
   recordDeletedInterruptionId,
   subscribeCloudStatus,
   probeFirestoreConnection,
-  isFirestoreQuotaExhausted
+  isFirestoreQuotaExhausted,
+  queueOutagesWriteToCloud
 } from '../lib/firestoreService';
 
 interface InterruptionContextType {
@@ -22,12 +23,14 @@ interface InterruptionContextType {
   updateInterruption: (id: string, entry: Partial<FeederInterruption>) => Promise<void>;
   deleteInterruption: (id: string) => Promise<void>;
   clearAllRestoredFeeders: () => Promise<void>;
+  resolveAllPreviousDayOutages: () => Promise<number>;
   triggerToast: (title: string, desc: string, type?: 'info' | 'success' | 'warn') => void;
   liveToast: { title: string; desc: string; type: 'info' | 'success' | 'warn' } | null;
   setLiveToast: React.Dispatch<React.SetStateAction<{ title: string; desc: string; type: 'info' | 'success' | 'warn' } | null>>;
   isCloudSyncActive: boolean;
   isQuotaExhausted: boolean;
   retryCloudSync: () => Promise<boolean>;
+  refreshInterruptions: () => Promise<void>;
   exportDataJson: () => string;
   importDataJson: (jsonStr: string) => { success: boolean; count: number; message: string };
 }
@@ -84,20 +87,38 @@ export const InterruptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     return unsub;
   }, []);
 
-  // Tab Leader Election: Ensures only ONE active Firestore snapshot listener per workstation
-  // Follower tabs receive updates via BroadcastChannel (0 Firestore reads)
-  const [isLeaderTab, setIsLeaderTab] = useState<boolean>(() => {
-    return !channel; // If no BroadcastChannel, this tab acts as its own leader
-  });
+  // 1. Zero-Overhead Real-Time Firestore Subscription:
+  // Every active tab connects to Firestore's live snapshot stream on 'systemSettings/liveInterruptions'.
+  // Firestore charges exactly 1 single read on connect, and ZERO reads while idling.
+  // It only receives 1 read when an interruption is actually created, edited, or restored.
+  useEffect(() => {
+    const unsub = subscribeToInterruptions((items) => {
+      if (Array.isArray(items)) {
+        setInterruptions(prev => {
+          const serializedPrev = JSON.stringify(prev);
+          const serializedNext = JSON.stringify(items);
+          if (serializedPrev === serializedNext) return prev;
+          
+          try {
+            localStorage.setItem('eeu-interruptions', serializedNext);
+          } catch (e) {
+            console.error('Failed to write Firestore updates to localStorage', e);
+          }
+          channel?.postMessage({ type: 'SYNC_INTERRUPTIONS', data: items });
+          return items;
+        });
+      }
+    });
 
-  const tabIdRef = React.useRef<string>(`tab_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`);
-  const lastLeaderHeartbeatRef = React.useRef<number>(0);
-  const currentLeaderIdRef = React.useRef<string | null>(null);
+    return () => {
+      unsub();
+    };
+  }, []);
 
-  // Broadcast channel message listener for instant cross-tab state syncing & tab leader election
+  // 2. Instant Cross-Tab Messaging via BroadcastChannel (0 Cloud Reads):
+  // Updates across multiple browser tabs on the same workstation sync locally with zero cloud reads.
   useEffect(() => {
     if (!channel) return;
-    const myTabId = tabIdRef.current;
 
     const handleMessage = (event: MessageEvent) => {
       const { type, data } = event.data || {};
@@ -119,94 +140,16 @@ export const InterruptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
         } catch (e) {
           console.error('Failed to persist synced data to localStorage', e);
         }
-      } else if (type === 'LEADER_HEARTBEAT' && data && data.leaderId) {
-        lastLeaderHeartbeatRef.current = Date.now();
-        if (data.leaderId !== myTabId) {
-          if (currentLeaderIdRef.current !== data.leaderId) {
-            currentLeaderIdRef.current = data.leaderId;
-            setIsLeaderTab(false);
-          }
-        }
-      } else if (type === 'PING_LEADER') {
-        if (currentLeaderIdRef.current === myTabId) {
-          channel.postMessage({
-            type: 'LEADER_HEARTBEAT',
-            data: { leaderId: myTabId, timestamp: Date.now() }
-          });
-        }
-      } else if (type === 'LEADER_RESIGN') {
-        if (currentLeaderIdRef.current === data?.leaderId) {
-          // The previous leader tab was closed; claim leadership immediately
-          currentLeaderIdRef.current = myTabId;
-          lastLeaderHeartbeatRef.current = Date.now();
-          setIsLeaderTab(true);
-          channel.postMessage({
-            type: 'LEADER_HEARTBEAT',
-            data: { leaderId: myTabId, timestamp: Date.now() }
-          });
-        }
       }
     };
 
     channel.addEventListener('message', handleMessage);
-
-    // Announce presence and query if an existing leader tab is running
-    channel.postMessage({ type: 'PING_LEADER', data: { tabId: myTabId } });
-
-    // Periodic heartbeat loop
-    const heartbeatInterval = setInterval(() => {
-      if (currentLeaderIdRef.current === myTabId) {
-        channel.postMessage({
-          type: 'LEADER_HEARTBEAT',
-          data: { leaderId: myTabId, timestamp: Date.now() }
-        });
-      } else {
-        // Follower tab: if no heartbeat received for > 5 seconds, take over
-        const elapsed = Date.now() - lastLeaderHeartbeatRef.current;
-        if (lastLeaderHeartbeatRef.current > 0 && elapsed > 5000) {
-          currentLeaderIdRef.current = myTabId;
-          lastLeaderHeartbeatRef.current = Date.now();
-          setIsLeaderTab(true);
-          channel.postMessage({
-            type: 'LEADER_HEARTBEAT',
-            data: { leaderId: myTabId, timestamp: Date.now() }
-          });
-        }
-      }
-    }, 2000);
-
-    // Initial election delay: If no heartbeat arrives within 400ms after mount, claim leadership
-    const initialElectionTimeout = setTimeout(() => {
-      if (!currentLeaderIdRef.current || currentLeaderIdRef.current === myTabId) {
-        currentLeaderIdRef.current = myTabId;
-        lastLeaderHeartbeatRef.current = Date.now();
-        setIsLeaderTab(true);
-        channel.postMessage({
-          type: 'LEADER_HEARTBEAT',
-          data: { leaderId: myTabId, timestamp: Date.now() }
-        });
-      }
-    }, 400);
-
-    const handleBeforeUnload = () => {
-      if (currentLeaderIdRef.current === myTabId) {
-        channel.postMessage({ type: 'LEADER_RESIGN', data: { leaderId: myTabId } });
-      }
-    };
-    window.addEventListener('beforeunload', handleBeforeUnload);
-
     return () => {
-      clearInterval(heartbeatInterval);
-      clearTimeout(initialElectionTimeout);
       channel.removeEventListener('message', handleMessage);
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-      if (currentLeaderIdRef.current === myTabId) {
-        channel.postMessage({ type: 'LEADER_RESIGN', data: { leaderId: myTabId } });
-      }
     };
   }, []);
 
-  // Storage event listener to sync across tabs if broadcast channel is inactive
+  // 3. Storage event listener as fallback for cross-window local sync (0 Cloud Reads)
   useEffect(() => {
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === 'eeu-interruptions' && e.newValue) {
@@ -226,71 +169,39 @@ export const InterruptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     };
   }, []);
 
-  // OPTIMIZATION 1: PAGE VISIBILITY API
-  // Disconnect the real-time listener when user locks phone screen, switches apps,
-  // or switches browser tabs. When returning to the app, reconnect and do a quick fresh sync.
-  const [isDocumentVisible, setIsDocumentVisible] = useState<boolean>(() => {
-    return typeof document !== 'undefined' ? !document.hidden : true;
-  });
-
+  // 4. Sleep Recovery Hook:
+  // Only re-checks the cloud if the workstation was locked/asleep for over 15 minutes.
+  // Normal clicking in and out of windows consumes ZERO additional reads.
+  const hiddenTimeRef = React.useRef<number>(0);
   useEffect(() => {
-    if (typeof document === 'undefined') return;
+    if (typeof window === 'undefined') return;
 
-    const handleVisibilityChange = () => {
-      const visible = !document.hidden;
-      setIsDocumentVisible(visible);
-      if (visible) {
-        // Upon returning, fetch fresh state once to catch up without missing any updates
-        fetchLatestInterruptions().then(fresh => {
-          if (fresh && fresh.length > 0) {
-            setInterruptions(prev => {
-              if (JSON.stringify(prev) === JSON.stringify(fresh)) return prev;
+    const handleVisibility = () => {
+      if (document.hidden) {
+        hiddenTimeRef.current = Date.now();
+      } else {
+        const awayTime = Date.now() - hiddenTimeRef.current;
+        // Only trigger server fetch if computer was asleep or tab away for > 15 minutes
+        if (hiddenTimeRef.current > 0 && awayTime > 15 * 60 * 1000) {
+          hiddenTimeRef.current = 0;
+          fetchLatestInterruptions().then(fresh => {
+            if (Array.isArray(fresh)) {
+              setInterruptions(fresh);
               try {
                 localStorage.setItem('eeu-interruptions', JSON.stringify(fresh));
               } catch {}
               channel?.postMessage({ type: 'SYNC_INTERRUPTIONS', data: fresh });
-              return fresh;
-            });
-          }
-        }).catch(() => {});
+            }
+          }).catch(() => {});
+        }
       }
     };
 
-    document.addEventListener('visibilitychange', handleVisibilityChange);
+    document.addEventListener('visibilitychange', handleVisibility);
     return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      document.removeEventListener('visibilitychange', handleVisibility);
     };
   }, []);
-
-  // Continuous real-time subscription to Firestore live interruptions
-  // CRITICAL READ OPTIMIZATION:
-  // 1. Only the elected Leader Tab opens this Firestore snapshot listener!
-  // 2. Listener is active ONLY when the tab is currently visible (saves 80%+ reads when idle/locked)!
-  useEffect(() => {
-    if (!isLeaderTab || !isDocumentVisible) {
-      return;
-    }
-
-    const unsub = subscribeToInterruptions((items) => {
-      setInterruptions(prev => {
-        const serializedPrev = JSON.stringify(prev);
-        const serializedNext = JSON.stringify(items);
-        if (serializedPrev === serializedNext) return prev;
-        
-        try {
-          localStorage.setItem('eeu-interruptions', serializedNext);
-        } catch (e) {
-          console.error('Failed to write Firestore updates to localStorage', e);
-        }
-        channel?.postMessage({ type: 'SYNC_INTERRUPTIONS', data: items });
-        return items;
-      });
-    });
-
-    return () => {
-      unsub();
-    };
-  }, [isLeaderTab, isDocumentVisible]);
 
   // Keep active local state clean and bounded
   useEffect(() => {
@@ -507,6 +418,62 @@ export const InterruptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }
   };
 
+  const refreshInterruptions = async (): Promise<void> => {
+    try {
+      const fresh = await fetchLatestInterruptions();
+      if (Array.isArray(fresh)) {
+        setInterruptions(fresh);
+        try {
+          localStorage.setItem('eeu-interruptions', JSON.stringify(fresh));
+        } catch {}
+        channel?.postMessage({ type: 'SYNC_INTERRUPTIONS', data: fresh });
+        triggerToast('Synchronized with Cloud', `Live board updated with ${fresh.length} active record(s) from database.`, 'success');
+      }
+    } catch (e) {
+      console.warn('Manual refresh failed:', e);
+      triggerToast('Sync Note', 'Could not fetch live updates from server; local cache is active.', 'info');
+    }
+  };
+
+  const resolveAllPreviousDayOutages = async (): Promise<number> => {
+    const previous = interruptions.filter(i => !isOutageFromToday(i.startTime) && !isFeederRestored(i));
+    if (previous.length === 0) {
+      triggerToast('No Past Outages', 'All active feeder lines are from today.', 'info');
+      return 0;
+    }
+
+    const timestampStr = new Date().toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    });
+
+    const previousIds = new Set(previous.map(p => p.id));
+    const updated = interruptions.map(i => {
+      if (previousIds.has(i.id)) {
+        return {
+          ...i,
+          status: InterruptionStatus.RESTORED,
+          estimatedRestorationTime: timestampStr,
+          lastUpdated: timestampStr
+        };
+      }
+      return i;
+    });
+
+    setInterruptions(updated);
+    try {
+      localStorage.setItem('eeu-interruptions', JSON.stringify(updated));
+    } catch {}
+    channel?.postMessage({ type: 'SYNC_INTERRUPTIONS', data: updated });
+
+    queueOutagesWriteToCloud(updated, timestampStr, true);
+    triggerToast('Past Outages Cleared', `Successfully marked ${previous.length} previous day interruptions as Restored and moved to Archive.`, 'success');
+    return previous.length;
+  };
+
   return (
     <InterruptionContext.Provider value={{
       interruptions,
@@ -515,12 +482,14 @@ export const InterruptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
       updateInterruption,
       deleteInterruption,
       clearAllRestoredFeeders,
+      resolveAllPreviousDayOutages,
       triggerToast,
       liveToast,
       setLiveToast,
       isCloudSyncActive: cloudStatus.connected && !cloudStatus.quotaExhausted,
       isQuotaExhausted: cloudStatus.quotaExhausted,
       retryCloudSync,
+      refreshInterruptions,
       exportDataJson,
       importDataJson
     }}>
