@@ -168,37 +168,45 @@ export const InterruptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     };
   }, []);
 
-  // 4. Sleep Recovery Hook:
-  // Only re-checks the cloud if the workstation was locked/asleep for over 15 minutes.
-  // Normal clicking in and out of windows consumes ZERO additional reads.
-  const hiddenTimeRef = React.useRef<number>(0);
+  // 4. Robust Real-Time Watchdog (Heartbeat + Focus + Visibility Recovery)
+  // This ensures the board NEVER freezes even if WebSockets are dropped by proxies/firewalls.
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    const handleVisibility = () => {
-      if (document.hidden) {
-        hiddenTimeRef.current = Date.now();
-      } else {
-        const awayTime = Date.now() - hiddenTimeRef.current;
-        // Only trigger server fetch if computer was asleep or tab away for > 15 minutes
-        if (hiddenTimeRef.current > 0 && awayTime > 15 * 60 * 1000) {
-          hiddenTimeRef.current = 0;
-          fetchLatestInterruptions().then(fresh => {
-            if (Array.isArray(fresh)) {
-              setInterruptions(fresh);
-              try {
-                localStorage.setItem('eeu-interruptions', JSON.stringify(fresh));
-              } catch {}
-              channel?.postMessage({ type: 'SYNC_INTERRUPTIONS', data: fresh });
-            }
-          }).catch(() => {});
+    const forceSyncFromServer = async () => {
+      // Don't sync if tab is in background (saves reads)
+      if (typeof document !== 'undefined' && document.hidden) return;
+
+      try {
+        const fresh = await fetchLatestInterruptions();
+        if (Array.isArray(fresh)) {
+          setInterruptions(prev => {
+            if (JSON.stringify(prev) === JSON.stringify(fresh)) return prev;
+            try {
+              localStorage.setItem('eeu-interruptions', JSON.stringify(fresh));
+            } catch {}
+            channel?.postMessage({ type: 'SYNC_INTERRUPTIONS', data: fresh });
+            return fresh;
+          });
         }
+      } catch (err) {
+        console.warn('Watchdog sync note:', err);
       }
     };
 
-    document.addEventListener('visibilitychange', handleVisibility);
+    // A. Heartbeat: Force a fresh server fetch every 10 minutes (extremely safe for quota)
+    const heartbeat = setInterval(forceSyncFromServer, 10 * 60 * 1000);
+
+    // B. Focus Recovery: Sync immediately when the user clicks back into the app window
+    window.addEventListener('focus', forceSyncFromServer);
+
+    // C. Visibility Recovery: Sync when tab is brought back from background/minimized
+    document.addEventListener('visibilitychange', forceSyncFromServer);
+
     return () => {
-      document.removeEventListener('visibilitychange', handleVisibility);
+      clearInterval(heartbeat);
+      window.removeEventListener('focus', forceSyncFromServer);
+      document.removeEventListener('visibilitychange', forceSyncFromServer);
     };
   }, []);
 
