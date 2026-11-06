@@ -713,9 +713,8 @@ export default function AdminPanel({
     );
   });
 
-  const { clearAllRestoredFeeders, refreshInterruptions, resolveAllPreviousDayOutages } = useInterruptions();
+  const { clearAllRestoredFeeders, resolveAllPreviousDayOutages } = useInterruptions();
   const [isClearingRestored, setIsClearingRestored] = useState(false);
-  const [isAdminSyncing, setIsAdminSyncing] = useState(false);
   const [isResolvingPrevious, setIsResolvingPrevious] = useState(false);
 
   const activeOutagesCount = interruptions.filter(i => !isFeederRestored(i)).length;
@@ -798,34 +797,14 @@ export default function AdminPanel({
 
           
           {adminSubTab === 'outages' ? (
-            <div className="flex items-center gap-2">
-              <button
-                id="admin-sync-cloud-btn"
-                onClick={async () => {
-                  setIsAdminSyncing(true);
-                  try {
-                    await refreshInterruptions();
-                  } finally {
-                    setTimeout(() => setIsAdminSyncing(false), 600);
-                  }
-                }}
-                disabled={isAdminSyncing}
-                className="px-3.5 py-2.5 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-750 text-gray-700 dark:text-gray-300 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer border border-gray-200 dark:border-gray-700"
-                title="Force refresh live interruptions from cloud database"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${isAdminSyncing ? 'animate-spin text-eeu-green' : 'text-gray-500'}`} />
-                <span className="hidden sm:inline">{isAdminSyncing ? 'Syncing...' : 'Sync Cloud'}</span>
-              </button>
-
-              <button
-                id="admin-add-new-btn"
-                onClick={handleOpenAddForm}
-                className="px-4 py-2.5 bg-eeu-green hover:bg-eeu-green-hover text-white rounded-xl text-xs font-semibold flex items-center gap-2 transition-all shadow-lg shadow-eeu-green/15 cursor-pointer"
-              >
-                <Plus className="w-4 h-4" />
-                <span>Add Interruption</span>
-              </button>
-            </div>
+            <button
+              id="admin-add-new-btn"
+              onClick={handleOpenAddForm}
+              className="px-4 py-2.5 bg-eeu-green hover:bg-eeu-green-hover text-white rounded-xl text-xs font-semibold flex items-center gap-2 transition-all shadow-lg shadow-eeu-green/15 cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add Interruption</span>
+            </button>
           ) : adminSubTab === 'feeders' ? (
             <div className="flex items-center gap-2">
               {canEditFeeders && onResetMasterFeeders && (

@@ -30,7 +30,6 @@ interface InterruptionContextType {
   isCloudSyncActive: boolean;
   isQuotaExhausted: boolean;
   retryCloudSync: () => Promise<boolean>;
-  refreshInterruptions: () => Promise<void>;
   exportDataJson: () => string;
   importDataJson: (jsonStr: string) => { success: boolean; count: number; message: string };
 }
@@ -418,23 +417,6 @@ export const InterruptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }
   };
 
-  const refreshInterruptions = async (): Promise<void> => {
-    try {
-      const fresh = await fetchLatestInterruptions();
-      if (Array.isArray(fresh)) {
-        setInterruptions(fresh);
-        try {
-          localStorage.setItem('eeu-interruptions', JSON.stringify(fresh));
-        } catch {}
-        channel?.postMessage({ type: 'SYNC_INTERRUPTIONS', data: fresh });
-        triggerToast('Synchronized with Cloud', `Live board updated with ${fresh.length} active record(s) from database.`, 'success');
-      }
-    } catch (e) {
-      console.warn('Manual refresh failed:', e);
-      triggerToast('Sync Note', 'Could not fetch live updates from server; local cache is active.', 'info');
-    }
-  };
-
   const resolveAllPreviousDayOutages = async (): Promise<number> => {
     const previous = interruptions.filter(i => !isOutageFromToday(i.startTime) && !isFeederRestored(i));
     if (previous.length === 0) {
@@ -489,7 +471,6 @@ export const InterruptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
       isCloudSyncActive: cloudStatus.connected && !cloudStatus.quotaExhausted,
       isQuotaExhausted: cloudStatus.quotaExhausted,
       retryCloudSync,
-      refreshInterruptions,
       exportDataJson,
       importDataJson
     }}>
