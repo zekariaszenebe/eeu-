@@ -86,11 +86,8 @@ export default function App() {
     liveToast,
     setLiveToast,
     isCloudSyncActive,
-    isQuotaExhausted,
-    refreshInterruptions
+    isQuotaExhausted
   } = useInterruptions();
-
-  const [isHeaderSyncing, setIsHeaderSyncing] = useState<boolean>(false);
 
   const [feedersList, setFeedersList] = useState<string[]>(() => {
     const saved = localStorage.getItem('eeu-feeders-list-v4');
@@ -750,25 +747,6 @@ export default function App() {
               <div className="flex items-center gap-2.5">
                 {/* Theme Toggle Button */}
                 <ThemeToggle variant="dropdown" />
-
-                {/* Cloud Sync Status / Refresh Button */}
-                <button
-                  id="header-cloud-sync-btn"
-                  onClick={async () => {
-                    setIsHeaderSyncing(true);
-                    try {
-                      await refreshInterruptions();
-                    } finally {
-                      setTimeout(() => setIsHeaderSyncing(false), 600);
-                    }
-                  }}
-                  disabled={isHeaderSyncing}
-                  title="Check & Refresh Live Cloud Sync with Firebase Firestore"
-                  className="relative h-10 px-3.5 rounded-full bg-white dark:bg-gray-900 border border-gray-200/80 dark:border-gray-800 shadow-xs hover:shadow flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:text-eeu-green dark:hover:text-eeu-green hover:bg-gray-50 dark:hover:bg-gray-800 transition-all cursor-pointer shrink-0"
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 ${isHeaderSyncing ? 'animate-spin text-eeu-green' : isCloudSyncActive ? 'text-eeu-green' : 'text-amber-500'}`} />
-                  <span className="hidden xl:inline">{isHeaderSyncing ? 'Syncing...' : 'Sync Cloud'}</span>
-                </button>
 
                 {/* Feedback Button */}
                 <button
