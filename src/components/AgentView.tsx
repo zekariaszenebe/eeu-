@@ -6,8 +6,9 @@ import {
   Columns, Rows, Zap, Settings, Compass, ArrowUp, ArrowDown, ArrowLeft, ArrowRight,
   Trash2, Edit3, Plus, MessageSquare, AlertCircle, Languages,
   Undo, Redo, Bold, Italic, Underline, Strikethrough, AlignLeft, AlignCenter, AlignRight, AlignJustify, Table, ChevronDown,
-  Activity, Gauge, PowerOff, Server, Pin
+  Activity, Gauge, PowerOff, Server, Pin, RefreshCw
 } from 'lucide-react';
+import { useInterruptions } from '../context/InterruptionContext';
 import { FeederInterruption, InterruptionType, InterruptionStatus, normalizeInterruptionType, stripBrackets, TeamLeaderNote, isPlannedOrOperational, isFeederRestored, isInfoFeeder } from '../types';
 import { INITIAL_DISTRICTS } from '../data/mockData';
 import { INITIAL_FEEDERS_LIST } from '../data/feedersList';
@@ -210,6 +211,18 @@ interface AgentViewProps {
 }
 
 export default function AgentView({ interruptions, onTriggerMockIncident, isAdmin = false, teamLeaderNotes = [] }: AgentViewProps) {
+  const { refreshInterruptions, isCloudSyncActive } = useInterruptions();
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  const handleManualSync = async () => {
+    setIsSyncing(true);
+    try {
+      await refreshInterruptions();
+    } finally {
+      setTimeout(() => setIsSyncing(false), 600);
+    }
+  };
+
   // Direct state from the single root InterruptionContext subscription (eliminates duplicate Firestore reads)
   const liveInterruptions = interruptions || [];
 
@@ -869,7 +882,7 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
       <div className="glass-card rounded-3xl px-6 py-5 order-2">
         {/* Filters and sorting row */}
         <div className="flex items-center justify-between gap-6 flex-wrap">
-          <div className="flex-1 min-w-[280px] grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="flex-1 min-w-[280px] grid grid-cols-1 sm:grid-cols-3 gap-4">
             {/* Direction Filter */}
             <div className="flex items-center gap-2 w-full">
               <span className="text-xs font-sans text-gray-500 dark:text-gray-400 whitespace-nowrap">Direction:</span>
@@ -986,6 +999,21 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
               </button>
             </div>
 
+            {/* Sync Live Interruptions Button */}
+            <button
+              id="sync-live-outages-btn"
+              onClick={handleManualSync}
+              disabled={isSyncing}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer shadow-xs ${
+                isSyncing 
+                  ? 'bg-eeu-green/10 border-eeu-green text-eeu-green' 
+                  : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800 text-gray-700 dark:text-gray-300 hover:text-eeu-green dark:hover:text-eeu-green hover:border-eeu-green/40'
+              }`}
+              title="Sync live interruptions directly from cloud database"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin text-eeu-green' : isCloudSyncActive ? 'text-eeu-green' : 'text-amber-500'}`} />
+              <span className="hidden sm:inline">{isSyncing ? 'Syncing...' : 'Sync Live'}</span>
+            </button>
           </div>
         </div>
       </div>

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { FeederInterruption, InterruptionStatus, normalizeInterruptionType, isFeederRestored, isOutageFromToday } from '../types';
+import { FeederInterruption, InterruptionStatus, normalizeInterruptionType, isFeederRestored } from '../types';
 import { getCardinalDirection } from '../utils/direction';
 import { 
   addInterruptionDoc, 
@@ -12,8 +12,7 @@ import {
   recordDeletedInterruptionId,
   subscribeCloudStatus,
   probeFirestoreConnection,
-  isFirestoreQuotaExhausted,
-  queueOutagesWriteToCloud
+  isFirestoreQuotaExhausted
 } from '../lib/firestoreService';
 
 interface InterruptionContextType {
@@ -23,13 +22,13 @@ interface InterruptionContextType {
   updateInterruption: (id: string, entry: Partial<FeederInterruption>) => Promise<void>;
   deleteInterruption: (id: string) => Promise<void>;
   clearAllRestoredFeeders: () => Promise<void>;
-  resolveAllPreviousDayOutages: () => Promise<number>;
   triggerToast: (title: string, desc: string, type?: 'info' | 'success' | 'warn') => void;
   liveToast: { title: string; desc: string; type: 'info' | 'success' | 'warn' } | null;
   setLiveToast: React.Dispatch<React.SetStateAction<{ title: string; desc: string; type: 'info' | 'success' | 'warn' } | null>>;
   isCloudSyncActive: boolean;
   isQuotaExhausted: boolean;
   retryCloudSync: () => Promise<boolean>;
+  refreshInterruptions: () => Promise<void>;
   exportDataJson: () => string;
   importDataJson: (jsonStr: string) => { success: boolean; count: number; message: string };
 }
@@ -86,10 +85,26 @@ export const InterruptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     return unsub;
   }, []);
 
-  // 1. Zero-Overhead Real-Time Firestore Subscription:
-  // Every active tab connects to Firestore's live snapshot stream on 'systemSettings/liveInterruptions'.
-  // Firestore charges exactly 1 single read on connect, and ZERO reads while idling.
-  // It only receives 1 read when an interruption is actually created, edited, or restored.
+  // 1. Initial direct fetch on mount: Guarantees that any stale localStorage from yesterday
+  // is immediately overwritten with live, authoritative server data from Firestore.
+  useEffect(() => {
+    fetchLatestInterruptions().then(fresh => {
+      if (Array.isArray(fresh)) {
+        setInterruptions(prev => {
+          if (JSON.stringify(prev) === JSON.stringify(fresh)) return prev;
+          try {
+            localStorage.setItem('eeu-interruptions', JSON.stringify(fresh));
+          } catch {}
+          return fresh;
+        });
+      }
+    }).catch(err => {
+      console.warn('Initial server fetch note:', err);
+    });
+  }, []);
+
+  // 2. Real-time Firestore subscription:
+  // Every active tab connects to Firestore's live snapshot stream for instant updates.
   useEffect(() => {
     const unsub = subscribeToInterruptions((items) => {
       if (Array.isArray(items)) {
@@ -114,8 +129,7 @@ export const InterruptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     };
   }, []);
 
-  // 2. Instant Cross-Tab Messaging via BroadcastChannel (0 Cloud Reads):
-  // Updates across multiple browser tabs on the same workstation sync locally with zero cloud reads.
+  // 3. Instant cross-tab messaging via BroadcastChannel
   useEffect(() => {
     if (!channel) return;
 
@@ -148,7 +162,7 @@ export const InterruptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     };
   }, []);
 
-  // 3. Storage event listener as fallback for cross-window local sync (0 Cloud Reads)
+  // 4. Storage event listener as fallback for cross-window sync
   useEffect(() => {
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === 'eeu-interruptions' && e.newValue) {
@@ -168,17 +182,14 @@ export const InterruptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     };
   }, []);
 
-  // 4. Robust Real-Time Watchdog (Heartbeat + Focus + Visibility Recovery)
-  // This ensures the board NEVER freezes even if WebSockets are dropped by proxies/firewalls.
+  // 5. Page Visibility & Window Focus API:
+  // When user returns to tab, unlocks PC, or resumes from sleep, immediately fetch fresh data
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    const forceSyncFromServer = async () => {
-      // Don't sync if tab is in background (saves reads)
+    const syncOnFocus = () => {
       if (typeof document !== 'undefined' && document.hidden) return;
-
-      try {
-        const fresh = await fetchLatestInterruptions();
+      fetchLatestInterruptions().then(fresh => {
         if (Array.isArray(fresh)) {
           setInterruptions(prev => {
             if (JSON.stringify(prev) === JSON.stringify(fresh)) return prev;
@@ -189,25 +200,38 @@ export const InterruptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
             return fresh;
           });
         }
-      } catch (err) {
-        console.warn('Watchdog sync note:', err);
-      }
+      }).catch(() => {});
     };
 
-    // A. Heartbeat: Force a fresh server fetch every 10 minutes (extremely safe for quota)
-    const heartbeat = setInterval(forceSyncFromServer, 10 * 60 * 1000);
-
-    // B. Focus Recovery: Sync immediately when the user clicks back into the app window
-    window.addEventListener('focus', forceSyncFromServer);
-
-    // C. Visibility Recovery: Sync when tab is brought back from background/minimized
-    document.addEventListener('visibilitychange', forceSyncFromServer);
-
+    document.addEventListener('visibilitychange', syncOnFocus);
+    window.addEventListener('focus', syncOnFocus);
     return () => {
-      clearInterval(heartbeat);
-      window.removeEventListener('focus', forceSyncFromServer);
-      document.removeEventListener('visibilitychange', forceSyncFromServer);
+      document.removeEventListener('visibilitychange', syncOnFocus);
+      window.removeEventListener('focus', syncOnFocus);
     };
+  }, []);
+
+  // 6. Periodic Background Sync (Heartbeat):
+  // Every 45 seconds, pull fresh data to safeguard against silent WebSocket disconnects
+  // on corporate networks and proxies.
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      fetchLatestInterruptions().then(fresh => {
+        if (Array.isArray(fresh)) {
+          setInterruptions(prev => {
+            if (JSON.stringify(prev) === JSON.stringify(fresh)) return prev;
+            try {
+              localStorage.setItem('eeu-interruptions', JSON.stringify(fresh));
+            } catch {}
+            channel?.postMessage({ type: 'SYNC_INTERRUPTIONS', data: fresh });
+            return fresh;
+          });
+        }
+      }).catch(() => {});
+    }, 45000);
+
+    return () => clearInterval(interval);
   }, []);
 
   // Keep active local state clean and bounded
@@ -425,43 +449,21 @@ export const InterruptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }
   };
 
-  const resolveAllPreviousDayOutages = async (): Promise<number> => {
-    const previous = interruptions.filter(i => !isOutageFromToday(i.startTime) && !isFeederRestored(i));
-    if (previous.length === 0) {
-      triggerToast('No Past Outages', 'All active feeder lines are from today.', 'info');
-      return 0;
-    }
-
-    const timestampStr = new Date().toLocaleString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true
-    });
-
-    const previousIds = new Set(previous.map(p => p.id));
-    const updated = interruptions.map(i => {
-      if (previousIds.has(i.id)) {
-        return {
-          ...i,
-          status: InterruptionStatus.RESTORED,
-          estimatedRestorationTime: timestampStr,
-          lastUpdated: timestampStr
-        };
-      }
-      return i;
-    });
-
-    setInterruptions(updated);
+  const refreshInterruptions = async (): Promise<void> => {
     try {
-      localStorage.setItem('eeu-interruptions', JSON.stringify(updated));
-    } catch {}
-    channel?.postMessage({ type: 'SYNC_INTERRUPTIONS', data: updated });
-
-    queueOutagesWriteToCloud(updated, timestampStr, true);
-    triggerToast('Past Outages Cleared', `Successfully marked ${previous.length} previous day interruptions as Restored and moved to Archive.`, 'success');
-    return previous.length;
+      const fresh = await fetchLatestInterruptions();
+      if (Array.isArray(fresh)) {
+        setInterruptions(fresh);
+        try {
+          localStorage.setItem('eeu-interruptions', JSON.stringify(fresh));
+        } catch {}
+        channel?.postMessage({ type: 'SYNC_INTERRUPTIONS', data: fresh });
+        triggerToast('Synchronized with Cloud', `Live board updated with ${fresh.length} active record(s) from database.`, 'success');
+      }
+    } catch (e) {
+      console.warn('Manual refresh failed:', e);
+      triggerToast('Sync Note', 'Could not fetch live updates from server; local cache is active.', 'info');
+    }
   };
 
   return (
@@ -472,13 +474,13 @@ export const InterruptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
       updateInterruption,
       deleteInterruption,
       clearAllRestoredFeeders,
-      resolveAllPreviousDayOutages,
       triggerToast,
       liveToast,
       setLiveToast,
       isCloudSyncActive: cloudStatus.connected && !cloudStatus.quotaExhausted,
       isQuotaExhausted: cloudStatus.quotaExhausted,
       retryCloudSync,
+      refreshInterruptions,
       exportDataJson,
       importDataJson
     }}>
