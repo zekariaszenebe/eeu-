@@ -87,6 +87,7 @@ export const InterruptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
   // Tab Leader Election: Ensures only ONE active Firestore snapshot listener per workstation
   // Follower tabs receive updates via BroadcastChannel (0 Firestore reads)
   const [isLeaderTab, setIsLeaderTab] = useState<boolean>(() => {
+    if (typeof document !== 'undefined' && document.hidden) return false;
     return !channel; // If no BroadcastChannel, this tab acts as its own leader
   });
 
@@ -128,7 +129,9 @@ export const InterruptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
           }
         }
       } else if (type === 'PING_LEADER') {
-        if (currentLeaderIdRef.current === myTabId) {
+        // Only active, visible leader tabs respond to leader pings
+        const isVisible = typeof document !== 'undefined' ? !document.hidden : true;
+        if (currentLeaderIdRef.current === myTabId && isVisible) {
           channel.postMessage({
             type: 'LEADER_HEARTBEAT',
             data: { leaderId: myTabId, timestamp: Date.now() }
@@ -136,14 +139,21 @@ export const InterruptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
         }
       } else if (type === 'LEADER_RESIGN') {
         if (currentLeaderIdRef.current === data?.leaderId) {
-          // The previous leader tab was closed; claim leadership immediately
-          currentLeaderIdRef.current = myTabId;
-          lastLeaderHeartbeatRef.current = Date.now();
-          setIsLeaderTab(true);
-          channel.postMessage({
-            type: 'LEADER_HEARTBEAT',
-            data: { leaderId: myTabId, timestamp: Date.now() }
-          });
+          // The previous leader tab resigned or was hidden
+          currentLeaderIdRef.current = null;
+          const isVisible = typeof document !== 'undefined' ? !document.hidden : true;
+          if (isVisible) {
+            // Claim leadership immediately if visible
+            currentLeaderIdRef.current = myTabId;
+            lastLeaderHeartbeatRef.current = Date.now();
+            setIsLeaderTab(true);
+            channel.postMessage({
+              type: 'LEADER_HEARTBEAT',
+              data: { leaderId: myTabId, timestamp: Date.now() }
+            });
+          } else {
+            setIsLeaderTab(false);
+          }
         }
       }
     };
@@ -155,15 +165,23 @@ export const InterruptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
     // Periodic heartbeat loop
     const heartbeatInterval = setInterval(() => {
+      const isVisible = typeof document !== 'undefined' ? !document.hidden : true;
       if (currentLeaderIdRef.current === myTabId) {
-        channel.postMessage({
-          type: 'LEADER_HEARTBEAT',
-          data: { leaderId: myTabId, timestamp: Date.now() }
-        });
+        if (isVisible) {
+          channel.postMessage({
+            type: 'LEADER_HEARTBEAT',
+            data: { leaderId: myTabId, timestamp: Date.now() }
+          });
+        } else {
+          // Tab became hidden in background; resign immediately so a visible tab can listen
+          currentLeaderIdRef.current = null;
+          setIsLeaderTab(false);
+          channel.postMessage({ type: 'LEADER_RESIGN', data: { leaderId: myTabId } });
+        }
       } else {
-        // Follower tab: if no heartbeat received for > 5 seconds, take over
+        // Follower tab: if currently visible and no heartbeat received for > 3 seconds, take over
         const elapsed = Date.now() - lastLeaderHeartbeatRef.current;
-        if (lastLeaderHeartbeatRef.current > 0 && elapsed > 5000) {
+        if (isVisible && (lastLeaderHeartbeatRef.current === 0 || elapsed > 3000)) {
           currentLeaderIdRef.current = myTabId;
           lastLeaderHeartbeatRef.current = Date.now();
           setIsLeaderTab(true);
@@ -175,9 +193,10 @@ export const InterruptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
       }
     }, 2000);
 
-    // Initial election delay: If no heartbeat arrives within 400ms after mount, claim leadership
+    // Initial election delay: If no heartbeat arrives within 400ms after mount, claim leadership if visible
     const initialElectionTimeout = setTimeout(() => {
-      if (!currentLeaderIdRef.current || currentLeaderIdRef.current === myTabId) {
+      const isVisible = typeof document !== 'undefined' ? !document.hidden : true;
+      if (isVisible && (!currentLeaderIdRef.current || currentLeaderIdRef.current === myTabId)) {
         currentLeaderIdRef.current = myTabId;
         lastLeaderHeartbeatRef.current = Date.now();
         setIsLeaderTab(true);
@@ -236,13 +255,27 @@ export const InterruptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
   useEffect(() => {
     if (typeof document === 'undefined') return;
 
+    const myTabId = tabIdRef.current;
+
     const handleVisibilityChange = () => {
       const visible = !document.hidden;
       setIsDocumentVisible(visible);
+
       if (visible) {
-        // Upon returning, fetch fresh state once to catch up without missing any updates
+        // If there is currently no active visible leader, take over immediately
+        if (channel && (!currentLeaderIdRef.current || currentLeaderIdRef.current === myTabId)) {
+          currentLeaderIdRef.current = myTabId;
+          lastLeaderHeartbeatRef.current = Date.now();
+          setIsLeaderTab(true);
+          channel.postMessage({
+            type: 'LEADER_HEARTBEAT',
+            data: { leaderId: myTabId, timestamp: Date.now() }
+          });
+        }
+
+        // Upon returning, fetch fresh state once to catch up (handles 0 outages / cleared lists properly)
         fetchLatestInterruptions().then(fresh => {
-          if (fresh && fresh.length > 0) {
+          if (fresh && Array.isArray(fresh)) {
             setInterruptions(prev => {
               if (JSON.stringify(prev) === JSON.stringify(fresh)) return prev;
               try {
@@ -253,6 +286,13 @@ export const InterruptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
             });
           }
         }).catch(() => {});
+      } else {
+        // Tab became hidden in background; resign immediately so active visible tab takes over
+        if (channel && currentLeaderIdRef.current === myTabId) {
+          currentLeaderIdRef.current = null;
+          setIsLeaderTab(false);
+          channel.postMessage({ type: 'LEADER_RESIGN', data: { leaderId: myTabId } });
+        }
       }
     };
 
