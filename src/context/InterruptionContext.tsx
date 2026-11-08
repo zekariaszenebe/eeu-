@@ -84,6 +84,12 @@ export const InterruptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     return unsub;
   }, []);
 
+  useEffect(() => {
+    if (!cloudStatus.connected && !cloudStatus.quotaExhausted) {
+      triggerToast('Connection Lost', 'Unable to reach cloud server. Showing cached data.', 'warn');
+    }
+  }, [cloudStatus.connected, cloudStatus.quotaExhausted]);
+
   // Tab Leader Election: Ensures only ONE active Firestore snapshot listener per workstation
   // Follower tabs receive updates via BroadcastChannel (0 Firestore reads)
   const [isLeaderTab, setIsLeaderTab] = useState<boolean>(() => {

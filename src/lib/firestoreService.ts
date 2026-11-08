@@ -112,7 +112,12 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
     return;
   }
 
-  if (errCode === 'unavailable' || errMsg.includes('the client is offline') || errMsg.includes('unavailable')) {
+  if (
+    errCode === 'unavailable' || 
+    errMsg.includes('the client is offline') || 
+    errMsg.includes('unavailable') ||
+    errMsg.includes('tunnel')
+  ) {
     notifyCloudStatus(false, false);
     console.info(`Firestore [${operationType}] for path '${path}' operating in local offline cache mode.`);
     return;
@@ -237,14 +242,27 @@ export function isInterruptionDeleted(id: string): boolean {
  * and normalizes status and type.
  */
 export function cleanOutagesList(list: FeederInterruption[]): FeederInterruption[] {
-  if (!Array.isArray(list)) return [];
+  if (!Array.isArray(list)) {
+    console.warn('cleanOutagesList: input is not an array');
+    return [];
+  }
   const seen = new Set<string>();
   const result: FeederInterruption[] = [];
 
+  console.log('cleanOutagesList: input size', list.length);
   for (const item of list) {
-    if (!item || !item.id) continue;
-    if (isInterruptionDeleted(item.id)) continue;
-    if (seen.has(item.id)) continue;
+    if (!item || !item.id) {
+      console.warn('cleanOutagesList: item missing id');
+      continue;
+    }
+    if (isInterruptionDeleted(item.id)) {
+      console.log('cleanOutagesList: item marked deleted', item.id);
+      continue;
+    }
+    if (seen.has(item.id)) {
+      console.log('cleanOutagesList: item duplicate', item.id);
+      continue;
+    }
     seen.add(item.id);
 
     result.push({
@@ -254,6 +272,7 @@ export function cleanOutagesList(list: FeederInterruption[]): FeederInterruption
     });
   }
 
+  console.log('cleanOutagesList: output size', result.length);
   return result.sort((a, b) => {
     const aRestored = isFeederRestored(a);
     const bRestored = isFeederRestored(b);
@@ -276,10 +295,14 @@ export function subscribeToInterruptions(onUpdate: (items: FeederInterruption[])
 
       if (snap.exists()) {
         const data = snap.data();
+        console.log('Firestore snapshot received:', data.outages?.length || 0, 'items');
         if (Array.isArray(data.outages)) {
           outages = cleanOutagesList(data.outages as FeederInterruption[]);
+        } else {
+          console.warn('Firestore snapshot missing outages array');
         }
       } else {
+        console.warn('Firestore snapshot does not exist');
         const localCached = cleanOutagesList(getLocal<FeederInterruption[]>('eeu-interruptions', []));
         outages = localCached;
         if (!isFirestoreQuotaExhausted()) {
@@ -288,11 +311,15 @@ export function subscribeToInterruptions(onUpdate: (items: FeederInterruption[])
       }
 
       notifyCloudStatus(true, false);
+      if (outages.length === 0) {
+        console.warn('Attempted to write empty outage list to localStorage!');
+      }
       setLocal('eeu-interruptions', outages);
       
       // Notify all registered callbacks
       subscriptionMap.get(docPath)?.callbacks.forEach(cb => cb(outages));
     }, (err) => {
+      console.error('Firestore snapshot error:', err);
       handleFirestoreError(err, OperationType.GET, docPath);
       const cached = cleanOutagesList(getLocal<FeederInterruption[]>('eeu-interruptions', []));
       subscriptionMap.get(docPath)?.callbacks.forEach(cb => cb(cached));
