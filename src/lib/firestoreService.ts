@@ -232,7 +232,7 @@ export function recordDeletedInterruptionId(id: string) {
 export function isInterruptionDeleted(id: string): boolean {
   if (!id) return true;
   const legacyMockIds = new Set(['f-1','f-2','f-3','f-4','f-5','f-6','f-7','f-8','f-9','f-10','f-11','f-12','f-13']);
-  if (legacyMockIds.has(id) || /^f-\d{1,2}$/.test(id)) return true;
+  if (legacyMockIds.has(id)) return true;
   const list = getLocal<string[]>('eeu-deleted-ids', []);
   return list.includes(id);
 }
