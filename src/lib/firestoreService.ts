@@ -305,7 +305,7 @@ export function subscribeToInterruptions(onUpdate: (items: FeederInterruption[])
         console.warn('Firestore snapshot does not exist');
         const localCached = cleanOutagesList(getLocal<FeederInterruption[]>('eeu-interruptions', []));
         outages = localCached;
-        if (!isFirestoreQuotaExhausted()) {
+        if (!isFirestoreQuotaExhausted() && localCached.length > 0) {
           setDoc(liveDocRef, { outages: localCached, lastUpdated: new Date().toISOString() }).catch(() => {});
         }
       }
