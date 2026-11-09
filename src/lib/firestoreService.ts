@@ -13,7 +13,8 @@ import {
   orderBy,
   limit,
   where,
-  disableNetwork
+  disableNetwork,
+  runTransaction
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { FeederInterruption, InterruptionStatus, InterruptionType, normalizeInterruptionType, isFeederRestored, normalizeInterruptionStatus, TeamLeaderNote, ContactItem, TeamLeaderUser } from '../types';
@@ -229,6 +230,15 @@ export function recordDeletedInterruptionId(id: string) {
   }
 }
 
+export function unrecordDeletedInterruptionId(id: string) {
+  if (!id) return;
+  const list = getLocal<string[]>('eeu-deleted-ids', []);
+  const filtered = list.filter(item => item !== id);
+  if (filtered.length !== list.length) {
+    setLocal('eeu-deleted-ids', filtered);
+  }
+}
+
 export function isInterruptionDeleted(id: string): boolean {
   if (!id) return true;
   const legacyMockIds = new Set(['f-1','f-2','f-3','f-4','f-5','f-6','f-7','f-8','f-9','f-10','f-11','f-12','f-13']);
@@ -311,10 +321,18 @@ export function subscribeToInterruptions(onUpdate: (items: FeederInterruption[])
       }
 
       notifyCloudStatus(true, false);
-      if (outages.length === 0) {
-        console.warn('Attempted to write empty outage list to localStorage!');
+
+      const localCached = cleanOutagesList(getLocal<FeederInterruption[]>('eeu-interruptions', []));
+      // Safeguard: If incoming outages is empty, but local storage currently has non-empty valid data,
+      // prevent clobbering existing outages unless this is an intentional purge
+      if (outages.length === 0 && localCached.length > 0) {
+        console.warn('Ignoring empty Firestore snapshot to protect active local interruptions');
+        return;
       }
-      setLocal('eeu-interruptions', outages);
+
+      if (outages.length > 0) {
+        setLocal('eeu-interruptions', outages);
+      }
       
       // Notify all registered callbacks
       subscriptionMap.get(docPath)?.callbacks.forEach(cb => cb(outages));
@@ -322,7 +340,9 @@ export function subscribeToInterruptions(onUpdate: (items: FeederInterruption[])
       console.error('Firestore snapshot error:', err);
       handleFirestoreError(err, OperationType.GET, docPath);
       const cached = cleanOutagesList(getLocal<FeederInterruption[]>('eeu-interruptions', []));
-      subscriptionMap.get(docPath)?.callbacks.forEach(cb => cb(cached));
+      if (cached.length > 0) {
+        subscriptionMap.get(docPath)?.callbacks.forEach(cb => cb(cached));
+      }
     });
     
     subscriptionMap.set(docPath, { unsub, callbacks: new Set() });
@@ -331,8 +351,11 @@ export function subscribeToInterruptions(onUpdate: (items: FeederInterruption[])
   const manager = subscriptionMap.get(docPath)!;
   manager.callbacks.add(onUpdate);
   
-  // Return initial data immediately
-  onUpdate(cleanOutagesList(getLocal<FeederInterruption[]>('eeu-interruptions', [])));
+  // Return initial data immediately only if we have non-empty cache to prevent wiping React state
+  const initialCache = cleanOutagesList(getLocal<FeederInterruption[]>('eeu-interruptions', []));
+  if (initialCache.length > 0) {
+    onUpdate(initialCache);
+  }
 
   return () => {
     manager.callbacks.delete(onUpdate);
@@ -360,8 +383,10 @@ export async function fetchLatestInterruptions(): Promise<FeederInterruption[]> 
       const data = snap.data();
       if (Array.isArray(data.outages)) {
         const cleaned = cleanOutagesList(data.outages as FeederInterruption[]);
-        setLocal('eeu-interruptions', cleaned);
-        return cleaned;
+        if (cleaned.length > 0) {
+          setLocal('eeu-interruptions', cleaned);
+          return cleaned;
+        }
       }
     }
   } catch (err) {
@@ -453,6 +478,12 @@ export async function flushPendingOutagesWrite(): Promise<void> {
   const timeToWrite = pendingTimestamp || new Date().toISOString();
   pendingOutagesList = null;
 
+  // SAFETY GUARD: NEVER write an empty array to Firestore through debounced flushes
+  if (listToWrite.length === 0) {
+    console.warn('flushPendingOutagesWrite blocked: Attempted to write empty outage list to Firestore!');
+    return;
+  }
+
   if (isFirestoreQuotaExhausted()) return;
 
   try {
@@ -476,6 +507,10 @@ if (typeof window !== 'undefined') {
 }
 
 export function queueOutagesWriteToCloud(list: FeederInterruption[], timestampStr: string, immediate: boolean = false): void {
+  // Safety guard against queueing empty list
+  if (list.length === 0) {
+    return;
+  }
   pendingOutagesList = list;
   pendingTimestamp = timestampStr;
 
@@ -531,7 +566,7 @@ export interface InterruptionMutationResult {
 }
 
 /**
- * Creates a new interruption and updates Firestore/local storage.
+ * Creates a new interruption and atomically merges it into Firestore document.
  */
 export async function addInterruptionDoc(entry: Omit<FeederInterruption, 'id' | 'lastUpdated'>, customId?: string): Promise<InterruptionMutationResult> {
   const suffix = Math.random().toString(36).substring(2, 9);
@@ -543,6 +578,8 @@ export async function addInterruptionDoc(entry: Omit<FeederInterruption, 'id' | 
     minute: '2-digit',
     hour12: true
   });
+
+  unrecordDeletedInterruptionId(newId);
 
   const rawRecord: FeederInterruption = {
     id: newId,
@@ -560,8 +597,8 @@ export async function addInterruptionDoc(entry: Omit<FeederInterruption, 'id' | 
 
   const record = sanitizeInterruptionDoc(rawRecord) as unknown as FeederInterruption;
 
-  // Local storage update
-  const localList = getLocal<FeederInterruption[]>('eeu-interruptions', []);
+  // Optimistic local storage update
+  const localList = cleanOutagesList(getLocal<FeederInterruption[]>('eeu-interruptions', []));
   const updatedList = [record, ...localList.filter(i => i.id !== newId)];
   setLocal('eeu-interruptions', updatedList);
 
@@ -569,14 +606,33 @@ export async function addInterruptionDoc(entry: Omit<FeederInterruption, 'id' | 
     return { record, syncedToCloud: false, quotaExhausted: true };
   }
 
-  // Flush immediate cloud write so all terminals sync instantly
-  queueOutagesWriteToCloud(updatedList, timestampStr, true);
-  return { record, syncedToCloud: true, quotaExhausted: false };
+  // Atomically merge into Firestore document systemSettings/liveInterruptions
+  try {
+    const liveDocRef = doc(db, 'systemSettings', 'liveInterruptions');
+    await runTransaction(db, async (txn) => {
+      const snap = await txn.get(liveDocRef);
+      let cloudOutages: FeederInterruption[] = [];
+      if (snap.exists()) {
+        const data = snap.data();
+        if (Array.isArray(data.outages)) {
+          cloudOutages = data.outages as FeederInterruption[];
+        }
+      }
+      // Merge: new record at the top, preserve all non-duplicate cloud records
+      const merged = cleanOutagesList([record, ...cloudOutages.filter(i => i.id !== newId)]);
+      txn.set(liveDocRef, { outages: merged, lastUpdated: timestampStr });
+      setLocal('eeu-interruptions', merged);
+    });
+    notifyCloudStatus(true, false);
+    return { record, syncedToCloud: true, quotaExhausted: false };
+  } catch (err) {
+    handleFirestoreError(err, OperationType.UPDATE, 'systemSettings/liveInterruptions');
+    return { record, syncedToCloud: false, quotaExhausted: false };
+  }
 }
 
-
 /**
- * Updates an interruption and conditionally adds a progress notification.
+ * Updates an interruption atomically in Firestore.
  */
 export async function updateInterruptionDoc(id: string, entry: Partial<FeederInterruption>, existingRecord?: FeederInterruption): Promise<InterruptionMutationResult> {
   const timestampStr = new Date().toLocaleString('en-US', {
@@ -617,8 +673,8 @@ export async function updateInterruptionDoc(id: string, entry: Partial<FeederInt
 
   const merged = sanitizeInterruptionDoc(rawMerged) as unknown as FeederInterruption;
 
-  // Local storage update
-  const localList = getLocal<FeederInterruption[]>('eeu-interruptions', []);
+  // Optimistic local storage update
+  const localList = cleanOutagesList(getLocal<FeederInterruption[]>('eeu-interruptions', []));
   const updatedList = localList.map(i => i.id === id ? merged : i);
   setLocal('eeu-interruptions', updatedList);
   
@@ -626,9 +682,39 @@ export async function updateInterruptionDoc(id: string, entry: Partial<FeederInt
     return { record: merged, syncedToCloud: false, quotaExhausted: true };
   }
 
-  // Flush immediate cloud write so all terminals sync instantly
-  queueOutagesWriteToCloud(updatedList, timestampStr, true);
-  return { record: merged, syncedToCloud: true, quotaExhausted: false };
+  // Atomically update in Firestore
+  try {
+    const liveDocRef = doc(db, 'systemSettings', 'liveInterruptions');
+    await runTransaction(db, async (txn) => {
+      const snap = await txn.get(liveDocRef);
+      let cloudOutages: FeederInterruption[] = [];
+      if (snap.exists()) {
+        const data = snap.data();
+        if (Array.isArray(data.outages)) {
+          cloudOutages = data.outages as FeederInterruption[];
+        }
+      }
+      let found = false;
+      const updated = cloudOutages.map(item => {
+        if (item.id === id) {
+          found = true;
+          return sanitizeInterruptionDoc({ ...item, ...merged, lastUpdated: timestampStr }) as unknown as FeederInterruption;
+        }
+        return item;
+      });
+      if (!found) {
+        updated.unshift(merged);
+      }
+      const cleaned = cleanOutagesList(updated);
+      txn.set(liveDocRef, { outages: cleaned, lastUpdated: timestampStr });
+      setLocal('eeu-interruptions', cleaned);
+    });
+    notifyCloudStatus(true, false);
+    return { record: merged, syncedToCloud: true, quotaExhausted: false };
+  } catch (err) {
+    handleFirestoreError(err, OperationType.UPDATE, 'systemSettings/liveInterruptions');
+    return { record: merged, syncedToCloud: false, quotaExhausted: false };
+  }
 }
 
 /**
@@ -644,9 +730,26 @@ export async function deleteInterruptionDoc(id: string): Promise<{ syncedToCloud
     return { syncedToCloud: false, quotaExhausted: true };
   }
 
-  // Flushes immediately on deletion
-  queueOutagesWriteToCloud(updatedList, new Date().toISOString(), true);
-  return { syncedToCloud: true, quotaExhausted: false };
+  try {
+    const liveDocRef = doc(db, 'systemSettings', 'liveInterruptions');
+    await runTransaction(db, async (txn) => {
+      const snap = await txn.get(liveDocRef);
+      if (snap.exists()) {
+        const data = snap.data();
+        if (Array.isArray(data.outages)) {
+          const remaining = (data.outages as FeederInterruption[]).filter(i => i.id !== id);
+          const cleaned = cleanOutagesList(remaining);
+          txn.set(liveDocRef, { outages: cleaned, lastUpdated: new Date().toISOString() });
+          setLocal('eeu-interruptions', cleaned);
+        }
+      }
+    });
+    notifyCloudStatus(true, false);
+    return { syncedToCloud: true, quotaExhausted: false };
+  } catch (err) {
+    handleFirestoreError(err, OperationType.DELETE, 'systemSettings/liveInterruptions');
+    return { syncedToCloud: false, quotaExhausted: false };
+  }
 }
 
 /**
@@ -664,9 +767,31 @@ export async function clearAllRestoredInterruptionsDoc(): Promise<{ count: numbe
     return { count: restoredItems.length, syncedToCloud: false, quotaExhausted: true };
   }
 
-  // Flushes immediately on clearing
-  queueOutagesWriteToCloud(activeOnly, new Date().toISOString(), true);
-  return { count: restoredItems.length, syncedToCloud: true, quotaExhausted: false };
+  try {
+    let purgedCount = restoredItems.length;
+    const liveDocRef = doc(db, 'systemSettings', 'liveInterruptions');
+    await runTransaction(db, async (txn) => {
+      const snap = await txn.get(liveDocRef);
+      if (snap.exists()) {
+        const data = snap.data();
+        if (Array.isArray(data.outages)) {
+          const cloudOutages = data.outages as FeederInterruption[];
+          const cloudRestored = cloudOutages.filter(i => isFeederRestored(i));
+          cloudRestored.forEach(i => recordDeletedInterruptionId(i.id));
+          purgedCount = Math.max(purgedCount, cloudRestored.length);
+          const cloudActive = cloudOutages.filter(i => !isFeederRestored(i));
+          const cleaned = cleanOutagesList(cloudActive);
+          txn.set(liveDocRef, { outages: cleaned, lastUpdated: new Date().toISOString() });
+          setLocal('eeu-interruptions', cleaned);
+        }
+      }
+    });
+    notifyCloudStatus(true, false);
+    return { count: purgedCount, syncedToCloud: true, quotaExhausted: false };
+  } catch (err) {
+    handleFirestoreError(err, OperationType.DELETE, 'systemSettings/liveInterruptions');
+    return { count: restoredItems.length, syncedToCloud: false, quotaExhausted: false };
+  }
 }
 
 /**

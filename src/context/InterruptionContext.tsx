@@ -1,18 +1,18 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { FeederInterruption, InterruptionStatus, normalizeInterruptionType, isFeederRestored } from '../types';
+import { FeederInterruption, InterruptionStatus, normalizeInterruptionType, isFeederRestored, isOutageFromToday } from '../types';
 import { getCardinalDirection } from '../utils/direction';
 import { 
   addInterruptionDoc, 
   updateInterruptionDoc, 
   deleteInterruptionDoc, 
-  subscribeToInterruptions,
-  fetchLatestInterruptions,
-  cleanOutagesList,
-  clearAllRestoredInterruptionsDoc,
-  recordDeletedInterruptionId,
-  subscribeCloudStatus,
-  probeFirestoreConnection,
-  isFirestoreQuotaExhausted
+  subscribeToInterruptions, 
+  fetchLatestInterruptions, 
+  cleanOutagesList, 
+  clearAllRestoredInterruptionsDoc, 
+  recordDeletedInterruptionId, 
+  subscribeCloudStatus, 
+  probeFirestoreConnection, 
+  isFirestoreQuotaExhausted 
 } from '../lib/firestoreService';
 
 interface InterruptionContextType {
@@ -22,6 +22,8 @@ interface InterruptionContextType {
   updateInterruption: (id: string, entry: Partial<FeederInterruption>) => Promise<void>;
   deleteInterruption: (id: string) => Promise<void>;
   clearAllRestoredFeeders: () => Promise<void>;
+  resolveAllPreviousDayOutages: () => Promise<void>;
+  refreshInterruptions: () => Promise<void>;
   triggerToast: (title: string, desc: string, type?: 'info' | 'success' | 'warn') => void;
   liveToast: { title: string; desc: string; type: 'info' | 'success' | 'warn' } | null;
   setLiveToast: React.Dispatch<React.SetStateAction<{ title: string; desc: string; type: 'info' | 'success' | 'warn' } | null>>;
@@ -97,6 +99,11 @@ export const InterruptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     return !channel; // If no BroadcastChannel, this tab acts as its own leader
   });
 
+  const interruptionsRef = React.useRef<FeederInterruption[]>(interruptions);
+  useEffect(() => {
+    interruptionsRef.current = interruptions;
+  }, [interruptions]);
+
   const tabIdRef = React.useRef<string>(`tab_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`);
   const lastLeaderHeartbeatRef = React.useRef<number>(0);
   const currentLeaderIdRef = React.useRef<string | null>(null);
@@ -119,12 +126,19 @@ export const InterruptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
           return next;
         });
       } else if (type === 'SYNC_INTERRUPTIONS' && Array.isArray(data)) {
+        // Guard: Do not wipe non-empty state with empty broadcast
+        if (data.length === 0 && interruptionsRef.current.length > 0) {
+          console.warn('Ignoring empty SYNC_INTERRUPTIONS broadcast');
+          return;
+        }
         const cleaned = cleanOutagesList(data);
-        setInterruptions(cleaned);
-        try {
-          localStorage.setItem('eeu-interruptions', JSON.stringify(cleaned));
-        } catch (e) {
-          console.error('Failed to persist synced data to localStorage', e);
+        if (cleaned.length > 0 || interruptionsRef.current.length === 0) {
+          setInterruptions(cleaned);
+          try {
+            localStorage.setItem('eeu-interruptions', JSON.stringify(cleaned));
+          } catch (e) {
+            console.error('Failed to persist synced data to localStorage', e);
+          }
         }
       } else if (type === 'LEADER_HEARTBEAT' && data && data.leaderId) {
         lastLeaderHeartbeatRef.current = Date.now();
@@ -142,6 +156,13 @@ export const InterruptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
             type: 'LEADER_HEARTBEAT',
             data: { leaderId: myTabId, timestamp: Date.now() }
           });
+          // Immediately sync current interruptions to the newly joined tab (0 extra Firestore reads)
+          if (interruptionsRef.current && interruptionsRef.current.length > 0) {
+            channel.postMessage({
+              type: 'SYNC_INTERRUPTIONS',
+              data: interruptionsRef.current
+            });
+          }
         }
       } else if (type === 'LEADER_RESIGN') {
         if (currentLeaderIdRef.current === data?.leaderId) {
@@ -279,10 +300,15 @@ export const InterruptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
           });
         }
 
-        // Upon returning, fetch fresh state once to catch up (handles 0 outages / cleared lists properly)
+        // Upon returning, fetch fresh state once to catch up
         fetchLatestInterruptions().then(fresh => {
           if (fresh && Array.isArray(fresh)) {
+            // Guard: Never overwrite non-empty active state with empty array from network error/empty fallback
+            if (fresh.length === 0 && interruptionsRef.current.length > 0) {
+              return;
+            }
             setInterruptions(prev => {
+              if (fresh.length === 0 && prev.length > 0) return prev;
               if (JSON.stringify(prev) === JSON.stringify(fresh)) return prev;
               try {
                 localStorage.setItem('eeu-interruptions', JSON.stringify(fresh));
@@ -319,6 +345,11 @@ export const InterruptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
     const unsub = subscribeToInterruptions((items) => {
       setInterruptions(prev => {
+        // Guard: Never overwrite non-empty active state with empty array from empty snapshot/race condition
+        if (items.length === 0 && prev.length > 0) {
+          console.warn('Ignoring empty interruptions snapshot to protect active state');
+          return prev;
+        }
         const serializedPrev = JSON.stringify(prev);
         const serializedNext = JSON.stringify(items);
         if (serializedPrev === serializedNext) return prev;
@@ -553,6 +584,37 @@ export const InterruptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }
   };
 
+  const resolveAllPreviousDayOutages = async () => {
+    try {
+      const targets = interruptions.filter(i => !isFeederRestored(i) && !isOutageFromToday(i.startTime));
+      if (targets.length === 0) {
+        triggerToast('No Previous Day Outages', 'All active feeder interruptions are from today.', 'info');
+        return;
+      }
+      for (const item of targets) {
+        await updateInterruption(item.id, { status: InterruptionStatus.RESTORED });
+      }
+      triggerToast('Previous Outages Resolved', `Marked ${targets.length} previous day interruptions as Restored.`, 'success');
+    } catch (e) {
+      console.error('Failed to resolve previous day outages:', e);
+      triggerToast('Action Failed', 'Could not resolve previous day interruptions.', 'warn');
+    }
+  };
+
+  const refreshInterruptions = async () => {
+    try {
+      const fresh = await fetchLatestInterruptions();
+      if (fresh && fresh.length > 0) {
+        setInterruptions(fresh);
+        triggerToast('Data Refreshed', `Synchronized ${fresh.length} interruptions from cloud server.`, 'success');
+      } else {
+        triggerToast('Up to Date', 'Already displaying the latest interruption state.', 'info');
+      }
+    } catch {
+      triggerToast('Refresh Failed', 'Could not refresh from cloud.', 'warn');
+    }
+  };
+
   return (
     <InterruptionContext.Provider value={{
       interruptions,
@@ -561,6 +623,8 @@ export const InterruptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
       updateInterruption,
       deleteInterruption,
       clearAllRestoredFeeders,
+      resolveAllPreviousDayOutages,
+      refreshInterruptions,
       triggerToast,
       liveToast,
       setLiveToast,
