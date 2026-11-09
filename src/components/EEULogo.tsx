@@ -69,7 +69,7 @@ export default function EEULogo({
         {/* Insulator pointing UPWARD on the top line */}
         <g transform="translate(58, 25.5)">
           {/* Ribbed insulator cups */}
-          <path d="M-3 0 h6 v-1.5 h-6 z" fill="#FFFFFF" />
+          <path d="M-3 h6 v-1.5 h-6 z" fill="#FFFFFF" />
           <path d="M-4.5 -3.5 h9 v-1.5 h-9 z" fill="#FFFFFF" />
           <path d="M-3.5 -5.5 h7 v-1.5 h-7 z" fill="#FFFFFF" />
           <path d="M-1.5 -7 h3 v-1 h-3 z" fill="#FFFFFF" />

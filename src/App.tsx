@@ -86,8 +86,7 @@ export default function App() {
     liveToast,
     setLiveToast,
     isCloudSyncActive,
-    isQuotaExhausted,
-    refreshInterruptions
+    isQuotaExhausted
   } = useInterruptions();
 
   const [feedersList, setFeedersList] = useState<string[]>(() => {

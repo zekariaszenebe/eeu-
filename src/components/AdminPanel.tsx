@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { 
   ShieldAlert, Lock, Unlock, Plus, Edit3, CheckCircle2, Trash2, X, AlertCircle, 
   RefreshCw, Info, MapPin, Zap, Clock, ShieldCheck, HelpCircle, Download, Copy, Check, Building,
-  UserCheck, Users, Eye, EyeOff, UserPlus, KeyRound, Shield, Search, Pin, CalendarClock, CheckCircle
+  UserCheck, Users, Eye, EyeOff, UserPlus, KeyRound, Shield, Search, Pin
 } from 'lucide-react';
-import { FeederInterruption, InterruptionType, InterruptionStatus, stripBrackets, TeamLeaderUser, UserRole, normalizeInterruptionType, isPlannedOrOperational, isFeederRestored, isInfoFeeder, isOutageFromToday } from '../types';
+import { FeederInterruption, InterruptionType, InterruptionStatus, stripBrackets, TeamLeaderUser, UserRole, normalizeInterruptionType, isPlannedOrOperational, isFeederRestored, isInfoFeeder } from '../types';
 import { INITIAL_DISTRICTS, INITIAL_FEEDERS_LIST } from '../data/mockData';
 import { InterruptionTypeBadge, getCardinalDirection } from './AgentView';
 import { LanguageMode, translateAmharicLocation, formatLocationDisplay } from '../utils/locationLanguage';
@@ -713,24 +713,11 @@ export default function AdminPanel({
     );
   });
 
-  const { clearAllRestoredFeeders, resolveAllPreviousDayOutages } = useInterruptions();
+  const { clearAllRestoredFeeders } = useInterruptions();
   const [isClearingRestored, setIsClearingRestored] = useState(false);
-  const [isResolvingPrevious, setIsResolvingPrevious] = useState(false);
 
   const activeOutagesCount = interruptions.filter(i => !isFeederRestored(i)).length;
   const restoredOutagesCount = interruptions.filter(i => isFeederRestored(i)).length;
-  const previousDayOutagesCount = interruptions.filter(i => !isFeederRestored(i) && !isOutageFromToday(i.startTime)).length;
-
-  const handleResolvePreviousDays = async () => {
-    if (window.confirm(`Mark all ${previousDayOutagesCount} previous day interruptions as Restored and move them to the archive?`)) {
-      setIsResolvingPrevious(true);
-      try {
-        await resolveAllPreviousDayOutages();
-      } finally {
-        setIsResolvingPrevious(false);
-      }
-    }
-  };
 
   const handleClearRestoredClick = async () => {
     if (window.confirm('Are you sure you want to permanently clear all restored feeder records from the database?')) {
@@ -895,36 +882,8 @@ export default function AdminPanel({
 
       {/* Grid Interruption Direct List Control */}
       {adminSubTab === 'outages' && (
-        <div className="space-y-4">
-          {previousDayOutagesCount > 0 && (
-            <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between gap-4 flex-wrap">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
-                  <CalendarClock className="w-5 h-5" />
-                </div>
-                <div className="text-left">
-                  <h4 className="text-xs font-bold text-amber-900 dark:text-amber-200">
-                    {previousDayOutagesCount} Active Feeder Disruption(s) from Previous Days
-                  </h4>
-                  <p className="text-[11px] text-amber-700/90 dark:text-amber-400/90 mt-0.5">
-                    These interruptions were logged on earlier shifts and remain marked Active in the database. If power was already restored in the field, click below to mark them Restored and clear today's live board.
-                  </p>
-                </div>
-              </div>
-              <button
-                id="admin-archive-previous-btn"
-                onClick={handleResolvePreviousDays}
-                disabled={isResolvingPrevious}
-                className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer shrink-0 disabled:opacity-50"
-              >
-                <CheckCircle className="w-3.5 h-3.5" />
-                <span>{isResolvingPrevious ? 'Archiving...' : `Archive All Previous Days (${previousDayOutagesCount})`}</span>
-              </button>
-            </div>
-          )}
-
-          <div className="glass-card rounded-2xl overflow-hidden font-sans">
-          <div className="p-5 border-b border-gray-200/30 dark:border-gray-800/30 bg-transparent flex items-center justify-between flex-wrap gap-3">
+        <div className="glass-card rounded-2xl overflow-hidden font-sans">
+        <div className="p-5 border-b border-gray-200/30 dark:border-gray-800/30 bg-transparent flex items-center justify-between flex-wrap gap-3">
           <div className="flex items-center gap-3 flex-wrap">
             <h3 className="font-display font-medium text-xs text-gray-600 dark:text-gray-400 uppercase tracking-wider">
               Active Feeder Disruptions ({sortedInterruptions.length})
@@ -1113,7 +1072,6 @@ export default function AdminPanel({
             </table>
           </div>
         )}
-        </div>
       </div>
       )}
 

@@ -869,7 +869,7 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
       <div className="glass-card rounded-3xl px-6 py-5 order-2">
         {/* Filters and sorting row */}
         <div className="flex items-center justify-between gap-6 flex-wrap">
-          <div className="flex-1 min-w-[280px] grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="flex-1 min-w-[280px] grid grid-cols-1 sm:grid-cols-3 gap-4">
             {/* Direction Filter */}
             <div className="flex items-center gap-2 w-full">
               <span className="text-xs font-sans text-gray-500 dark:text-gray-400 whitespace-nowrap">Direction:</span>
@@ -985,7 +985,6 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
                 <List className="w-4 h-4" />
               </button>
             </div>
-
           </div>
         </div>
       </div>

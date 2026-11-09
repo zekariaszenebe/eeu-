@@ -2,7 +2,6 @@ import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { 
   getFirestore, 
-  initializeFirestore,
   enableNetwork, 
   setLogLevel 
 } from 'firebase/firestore';
@@ -17,16 +16,8 @@ try {
 
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 
-// Initialize Firestore with auto-detect long polling to prevent ERR_TUNNEL_CONNECTION_FAILED behind corporate proxies
-export const db = (() => {
-  try {
-    return initializeFirestore(app, {
-      experimentalAutoDetectLongPolling: true,
-    }, firebaseConfig.firestoreDatabaseId);
-  } catch {
-    return getFirestore(app, firebaseConfig.firestoreDatabaseId);
-  }
-})();
+// Initialize Firestore with custom database ID from config
+export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 export const auth = getAuth(app);
 
 // Always ensure network is active
