@@ -92,6 +92,18 @@ export const InterruptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }
   }, [cloudStatus.connected, cloudStatus.quotaExhausted]);
 
+  // Fetch fresh cloud data immediately upon mount to bypass stale local cache
+  useEffect(() => {
+    fetchLatestInterruptions().then(fresh => {
+      if (fresh && fresh.length > 0) {
+        setInterruptions(fresh);
+        try {
+          localStorage.setItem('eeu-interruptions', JSON.stringify(fresh));
+        } catch {}
+      }
+    }).catch(() => {});
+  }, []);
+
   // Tab Leader Election & Document Visibility for Real-Time Snapshot Sync
   const [isLeaderTab, setIsLeaderTab] = useState<boolean>(() => !channel);
   const tabIdRef = React.useRef<string>(`tab_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`);
