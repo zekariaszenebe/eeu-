@@ -23,7 +23,7 @@ interface InterruptionContextType {
   deleteInterruption: (id: string) => Promise<void>;
   clearAllRestoredFeeders: () => Promise<void>;
   resolveAllPreviousDayOutages: () => Promise<void>;
-  refreshInterruptions: () => Promise<void>;
+  refreshAllData: () => Promise<void>;
   triggerToast: (title: string, desc: string, type?: 'info' | 'success' | 'warn') => void;
   liveToast: { title: string; desc: string; type: 'info' | 'success' | 'warn' } | null;
   setLiveToast: React.Dispatch<React.SetStateAction<{ title: string; desc: string; type: 'info' | 'success' | 'warn' } | null>>;
@@ -93,22 +93,7 @@ export const InterruptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
   }, [cloudStatus.connected, cloudStatus.quotaExhausted]);
 
 
-  // Data updates are now strictly manual via refreshAllData().
 
-  const refreshAllData = async () => {
-    try {
-      const fresh = await fetchLatestInterruptions();
-      setInterruptions(fresh);
-      channel?.postMessage({ type: 'SYNC_INTERRUPTIONS', data: fresh });
-      triggerToast('Data Refreshed', 'Successfully fetched latest data from cloud.', 'success');
-    } catch (e) {
-      console.error('Failed to refresh data:', e);
-      triggerToast('Refresh Failed', 'Could not fetch data from cloud.', 'warn');
-    }
-  };
-
-  // Storage event listener to sync across tabs if broadcast channel is inactive
-  useEffect(() => {
 
   // Keep active local state clean and bounded
   useEffect(() => {
