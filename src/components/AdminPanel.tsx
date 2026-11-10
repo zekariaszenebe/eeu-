@@ -713,9 +713,10 @@ export default function AdminPanel({
     );
   });
 
-  const { clearAllRestoredFeeders, resolveAllPreviousDayOutages } = useInterruptions();
+  const { clearAllRestoredFeeders, resolveAllPreviousDayOutages, refreshAllData } = useInterruptions();
   const [isClearingRestored, setIsClearingRestored] = useState(false);
   const [isResolvingPrevious, setIsResolvingPrevious] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   const activeOutagesCount = interruptions.filter(i => !isFeederRestored(i)).length;
   const restoredOutagesCount = interruptions.filter(i => isFeederRestored(i)).length;
@@ -778,6 +779,21 @@ export default function AdminPanel({
           >
             <Download className="w-3.5 h-3.5" />
             <span>Export CSV</span>
+          </button>
+
+          <button
+            id="admin-sync-cloud-btn"
+            onClick={async () => {
+              setIsSyncing(true);
+              await refreshAllData();
+              setIsSyncing(false);
+            }}
+            disabled={isSyncing}
+            className="px-4 py-2 text-xs font-semibold rounded-xl border border-eeu-green/20 dark:border-eeu-green/35 text-eeu-green hover:bg-eeu-green/10 flex items-center gap-2 transition-all cursor-pointer disabled:opacity-50"
+            title="Force sync and fetch the latest interruptions from cloud server"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
+            <span>{isSyncing ? 'Syncing...' : 'Sync Cloud'}</span>
           </button>
 
           <button
