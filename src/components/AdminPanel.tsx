@@ -498,8 +498,9 @@ export default function AdminPanel({
       return;
     }
 
-    if (!remark.trim()) {
-      setFormError(isInfo ? 'Please provide a technical remark or note.' : 'Please provide a status or action log remark.');
+    const isPlannedOrOp = type === InterruptionType.PLANNED_INTERRUPTION || type === InterruptionType.OPERATIONAL_INTERRUPTION;
+    if ((isInfo || isPlannedOrOp) && !remark.trim()) {
+      setFormError(isInfo ? 'Please provide a technical remark or note.' : 'Please provide a technical remark & action dispatch log for Planned or Operational interruptions.');
       return;
     }
 
@@ -522,7 +523,7 @@ export default function AdminPanel({
       startTime,
       estimatedRestorationTime: finalEstimatedRestoration,
       affectedArea: affectedArea.trim(),
-      remark: remark.trim()
+      remark: remark.trim() || 'N/A'
     };
 
     if (editingItem) {
@@ -1064,9 +1065,11 @@ export default function AdminPanel({
                           </span>
                         )}
                         
-                        <div className="text-[11px] text-gray-400 dark:text-gray-500 font-medium italic mt-1 max-w-[180px] truncate" title={item.remark}>
-                          {item.remark}
-                        </div>
+                        {item.remark && item.remark.trim() !== '' && item.remark.trim().toLowerCase() !== 'n/a' && (
+                          <div className="text-[11px] text-gray-400 dark:text-gray-500 font-medium italic mt-1 max-w-[180px] truncate" title={item.remark}>
+                            {item.remark}
+                          </div>
+                        )}
                       </td>
 
                       {/* Affected Area / Information snippet */}

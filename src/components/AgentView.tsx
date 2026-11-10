@@ -1299,9 +1299,11 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
                                   </p>
                                 </div>
 
-                                <div className={`text-xs ${isInfo ? 'text-gray-700 dark:text-gray-200 font-medium' : 'text-gray-500 dark:text-gray-400'} italic pl-3 border-l-2 ${isInfo ? 'border-amber-500 dark:border-amber-400' : 'border-gray-200 dark:border-gray-800'}`}>
-                                  &ldquo;{item.remark}&rdquo;
-                                </div>
+                                {item.remark && item.remark.trim() !== '' && item.remark.trim().toLowerCase() !== 'n/a' && (
+                                  <div className={`text-xs ${isInfo ? 'text-gray-700 dark:text-gray-200 font-medium' : 'text-gray-500 dark:text-gray-400'} italic pl-3 border-l-2 ${isInfo ? 'border-amber-500 dark:border-amber-400' : 'border-gray-200 dark:border-gray-800'}`}>
+                                    &ldquo;{item.remark}&rdquo;
+                                  </div>
+                                )}
                               </div>
 
                               {/* Right Column: Timing details & Index Ref */}
@@ -1441,9 +1443,11 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
                                 </div>
 
                                 {/* Remarks details */}
-                                <div className={`text-xs ${isInfo ? 'text-gray-700 dark:text-gray-200 font-medium' : 'text-gray-650 dark:text-gray-400'} leading-relaxed italic border-l-2 ${isInfo ? 'border-amber-500 dark:border-amber-400' : 'border-gray-300 dark:border-gray-800'} pl-3`}>
-                                  &ldquo;{item.remark}&rdquo;
-                                </div>
+                                {item.remark && item.remark.trim() !== '' && item.remark.trim().toLowerCase() !== 'n/a' && (
+                                  <div className={`text-xs ${isInfo ? 'text-gray-700 dark:text-gray-200 font-medium' : 'text-gray-650 dark:text-gray-400'} leading-relaxed italic border-l-2 ${isInfo ? 'border-amber-500 dark:border-amber-400' : 'border-gray-300 dark:border-gray-800'} pl-3`}>
+                                    &ldquo;{item.remark}&rdquo;
+                                  </div>
+                                )}
                               </div>
 
                               {/* Timing panel at bottom */}
