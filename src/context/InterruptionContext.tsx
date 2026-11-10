@@ -92,6 +92,140 @@ export const InterruptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }
   }, [cloudStatus.connected, cloudStatus.quotaExhausted]);
 
+  // Tab Leader Election & Document Visibility for Real-Time Snapshot Sync
+  const [isLeaderTab, setIsLeaderTab] = useState<boolean>(() => !channel);
+  const tabIdRef = React.useRef<string>(`tab_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`);
+  const lastLeaderHeartbeatRef = React.useRef<number>(0);
+  const currentLeaderIdRef = React.useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!channel) return;
+    const myTabId = tabIdRef.current;
+
+    const handleMessage = (event: MessageEvent) => {
+      const { type, data } = event.data || {};
+      if (type === 'DELETE_INTERRUPTION' && data && data.id) {
+        recordDeletedInterruptionId(data.id);
+        setInterruptions(prev => {
+          const next = prev.filter(i => i.id !== data.id);
+          try { localStorage.setItem('eeu-interruptions', JSON.stringify(next)); } catch {}
+          return next;
+        });
+      } else if (type === 'SYNC_INTERRUPTIONS' && Array.isArray(data)) {
+        const cleaned = cleanOutagesList(data);
+        setInterruptions(cleaned);
+        try { localStorage.setItem('eeu-interruptions', JSON.stringify(cleaned)); } catch {}
+      } else if (type === 'LEADER_HEARTBEAT' && data && data.leaderId) {
+        lastLeaderHeartbeatRef.current = Date.now();
+        if (data.leaderId !== myTabId && currentLeaderIdRef.current !== data.leaderId) {
+          currentLeaderIdRef.current = data.leaderId;
+          setIsLeaderTab(false);
+        }
+      } else if (type === 'PING_LEADER') {
+        if (currentLeaderIdRef.current === myTabId) {
+          channel.postMessage({ type: 'LEADER_HEARTBEAT', data: { leaderId: myTabId, timestamp: Date.now() } });
+        }
+      } else if (type === 'LEADER_RESIGN') {
+        if (currentLeaderIdRef.current === data?.leaderId) {
+          currentLeaderIdRef.current = myTabId;
+          lastLeaderHeartbeatRef.current = Date.now();
+          setIsLeaderTab(true);
+          channel.postMessage({ type: 'LEADER_HEARTBEAT', data: { leaderId: myTabId, timestamp: Date.now() } });
+        }
+      }
+    };
+
+    channel.addEventListener('message', handleMessage);
+    channel.postMessage({ type: 'PING_LEADER', data: { tabId: myTabId } });
+
+    const heartbeatInterval = setInterval(() => {
+      if (currentLeaderIdRef.current === myTabId) {
+        channel.postMessage({ type: 'LEADER_HEARTBEAT', data: { leaderId: myTabId, timestamp: Date.now() } });
+      } else {
+        const elapsed = Date.now() - lastLeaderHeartbeatRef.current;
+        if (lastLeaderHeartbeatRef.current > 0 && elapsed > 5000) {
+          currentLeaderIdRef.current = myTabId;
+          lastLeaderHeartbeatRef.current = Date.now();
+          setIsLeaderTab(true);
+          channel.postMessage({ type: 'LEADER_HEARTBEAT', data: { leaderId: myTabId, timestamp: Date.now() } });
+        }
+      }
+    }, 2000);
+
+    const initialElectionTimeout = setTimeout(() => {
+      if (!currentLeaderIdRef.current || currentLeaderIdRef.current === myTabId) {
+        currentLeaderIdRef.current = myTabId;
+        lastLeaderHeartbeatRef.current = Date.now();
+        setIsLeaderTab(true);
+        channel.postMessage({ type: 'LEADER_HEARTBEAT', data: { leaderId: myTabId, timestamp: Date.now() } });
+      }
+    }, 400);
+
+    const handleBeforeUnload = () => {
+      if (currentLeaderIdRef.current === myTabId) {
+        channel.postMessage({ type: 'LEADER_RESIGN', data: { leaderId: myTabId } });
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      clearInterval(heartbeatInterval);
+      clearTimeout(initialElectionTimeout);
+      channel.removeEventListener('message', handleMessage);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      if (currentLeaderIdRef.current === myTabId) {
+        channel.postMessage({ type: 'LEADER_RESIGN', data: { leaderId: myTabId } });
+      }
+    };
+  }, []);
+
+  const [isDocumentVisible, setIsDocumentVisible] = useState<boolean>(() => {
+    return typeof document !== 'undefined' ? !document.hidden : true;
+  });
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const handleVisibilityChange = () => {
+      const visible = !document.hidden;
+      setIsDocumentVisible(visible);
+      if (visible) {
+        fetchLatestInterruptions().then(fresh => {
+          if (fresh && fresh.length > 0) {
+            setInterruptions(prev => {
+              if (JSON.stringify(prev) === JSON.stringify(fresh)) return prev;
+              try { localStorage.setItem('eeu-interruptions', JSON.stringify(fresh)); } catch {}
+              channel?.postMessage({ type: 'SYNC_INTERRUPTIONS', data: fresh });
+              return fresh;
+            });
+          }
+        }).catch(() => {});
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isLeaderTab || !isDocumentVisible) return;
+    const unsub = subscribeToInterruptions((items) => {
+      setInterruptions(prev => {
+        const serializedPrev = JSON.stringify(prev);
+        const serializedNext = JSON.stringify(items);
+        if (serializedPrev === serializedNext) return prev;
+        try {
+          localStorage.setItem('eeu-interruptions', serializedNext);
+        } catch (e) {}
+        channel?.postMessage({ type: 'SYNC_INTERRUPTIONS', data: items });
+        return items;
+      });
+    });
+    return () => {
+      unsub();
+    };
+  }, [isLeaderTab, isDocumentVisible]);
+
 
 
 
