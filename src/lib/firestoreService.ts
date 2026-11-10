@@ -536,8 +536,8 @@ export async function addInterruptionDoc(entry: Omit<FeederInterruption, 'id' | 
     return { record, syncedToCloud: false, quotaExhausted: true };
   }
 
-  // Queue debounced cloud write (avoids duplicate bursts)
-  queueOutagesWriteToCloud(updatedList, timestampStr, false);
+  // Queue immediate cloud write to prevent race conditions
+  queueOutagesWriteToCloud(updatedList, timestampStr, true);
   return { record, syncedToCloud: true, quotaExhausted: false };
 }
 
@@ -593,8 +593,8 @@ export async function updateInterruptionDoc(id: string, entry: Partial<FeederInt
     return { record: merged, syncedToCloud: false, quotaExhausted: true };
   }
 
-  // Queue debounced cloud write (avoids duplicate bursts on rapid edits)
-  queueOutagesWriteToCloud(updatedList, timestampStr, false);
+  // Queue immediate cloud write to prevent race conditions
+  queueOutagesWriteToCloud(updatedList, timestampStr, true);
   return { record: merged, syncedToCloud: true, quotaExhausted: false };
 }
 

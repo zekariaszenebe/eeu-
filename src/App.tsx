@@ -86,7 +86,8 @@ export default function App() {
     liveToast,
     setLiveToast,
     isCloudSyncActive,
-    isQuotaExhausted
+    isQuotaExhausted,
+    refreshAllData
   } = useInterruptions();
 
   const [feedersList, setFeedersList] = useState<string[]>(() => {
@@ -747,6 +748,15 @@ export default function App() {
               <div className="flex items-center gap-2.5">
                 {/* Theme Toggle Button */}
                 <ThemeToggle variant="dropdown" />
+                
+                {/* Refresh Data Button */}
+                <button
+                  onClick={refreshAllData}
+                  className="h-10 px-3.5 rounded-full bg-white dark:bg-gray-900 border border-gray-200/80 dark:border-gray-800 shadow-xs hover:shadow flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:text-eeu-green transition-all cursor-pointer"
+                  title="Manual Refresh"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                </button>
 
                 {/* Feedback Button */}
                 <button

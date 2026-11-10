@@ -79,6 +79,16 @@ export function normalizeInterruptionStatus(raw: unknown): InterruptionStatus {
   return InterruptionStatus.ACTIVE;
 }
 
+/**
+ * Checks whether an interruption start time belongs to the current calendar day.
+ */
+export function isOutageFromToday(startTime?: string): boolean {
+  if (!startTime) return true;
+  const now = new Date();
+  const todayPrefix = now.toLocaleString('en-US', { month: 'short', day: 'numeric' });
+  return startTime.toLowerCase().startsWith(todayPrefix.toLowerCase());
+}
+
 export interface FeederInterruption {
   id: string;
   feederName: string;
