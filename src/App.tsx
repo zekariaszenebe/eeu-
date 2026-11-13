@@ -65,7 +65,6 @@ import EEULogo from './components/EEULogo';
 import WebLoginScreen from './components/WebLoginScreen';
 import FeedbackModal from './components/FeedbackModal';
 import { CloudSyncStatusModal } from './components/CloudSyncStatusModal';
-import InterruptionMapView from './components/InterruptionMapView';
 
 export default function App() {
   // 1. Theme State
@@ -75,13 +74,6 @@ export default function App() {
   // Feedback Modal & Cloud Status Modal State
   const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState<boolean>(false);
   const [isCloudStatusModalOpen, setIsCloudStatusModalOpen] = useState<boolean>(false);
-  const [gmpQuotaExceeded, setGmpQuotaExceeded] = useState<boolean>(false);
-
-  useEffect(() => {
-    const handleQuotaExceeded = () => setGmpQuotaExceeded(true);
-    window.addEventListener('gmp-quota-exceeded', handleQuotaExceeded);
-    return () => window.removeEventListener('gmp-quota-exceeded', handleQuotaExceeded);
-  }, []);
 
   // 2. Data State
   const {
@@ -593,23 +585,6 @@ export default function App() {
   return (
     <div className={isDarkMode ? 'dark' : ''}>
       <div className="min-h-screen mesh-bg text-gray-900 dark:text-gray-100 flex flex-col font-sans transition-colors duration-200">
-
-        {gmpQuotaExceeded && (
-          <div className="bg-amber-50 border-b border-amber-200 text-amber-900 px-4 py-2.5 text-xs md:text-sm text-center sticky top-0 z-50 shadow-sm">
-            <span>
-              Google Maps Platform quota reached. If you are the app owner, visit{' '}
-              <a
-                href="https://developers.google.com/maps/ai/ai-studio?utm_campaign=gmp_mcp_codeassist_v1_aistudio#quota_exceeded_errors"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="underline font-semibold text-amber-950 hover:text-amber-800"
-              >
-                maps developer site
-              </a>{' '}
-              for instructions to update your account.
-            </span>
-          </div>
-        )}
         
         {/* TOP MOBILE HEADER */}
         <header className="lg:hidden p-4 border-b border-gray-200/30 dark:border-gray-900/30 flex items-center justify-between glass-card rounded-none z-20 sticky top-0">
@@ -644,14 +619,6 @@ export default function App() {
               className={`w-full p-2.5 rounded-lg text-xs font-semibold flex items-center gap-2 ${currentTab === 'dashboard' ? 'bg-eeu-green text-white' : 'text-gray-600 dark:text-gray-400'}`}
             >
               Call Center Grid Board
-            </button>
-
-            <button
-              id="mob-nav-map"
-              onClick={() => { setCurrentTab('map'); setMobileMenuOpen(false); }}
-              className={`w-full p-2.5 rounded-lg text-xs font-semibold flex items-center gap-2 ${currentTab === 'map' ? 'bg-eeu-green text-white' : 'text-gray-600 dark:text-gray-400'}`}
-            >
-              Map (Addis Ababa & Sheger)
             </button>
 
             {isAdmin && (
@@ -826,7 +793,7 @@ export default function App() {
             </div>
 
             {/* LIVE DATA STATISTICS ROW */}
-            {currentTab !== 'map' && currentTab !== 'hub' && currentTab !== 'admin' && currentTab !== 'history' && currentTab !== 'contacts' && currentTab !== 'calculator' && currentTab !== 'smartmeter' && currentTab !== 'tariff' && currentTab !== 'sms-ticker' && <StatsGrid interruptions={interruptions} />}
+            {currentTab !== 'hub' && currentTab !== 'admin' && currentTab !== 'history' && currentTab !== 'contacts' && currentTab !== 'calculator' && currentTab !== 'smartmeter' && currentTab !== 'tariff' && currentTab !== 'sms-ticker' && <StatsGrid interruptions={interruptions} />}
 
             {/* DETAILED VIEWS CONTAINER */}
             <div id="active-tab-container" className="pt-2 animate-in fade-in-40 duration-200">
@@ -836,13 +803,6 @@ export default function App() {
                   onTriggerMockIncident={handleTriggerMockIncident} 
                   isAdmin={isAdmin}
                   teamLeaderNotes={teamLeaderNotes}
-                />
-              )}
-
-              {currentTab === 'map' && (
-                <InterruptionMapView
-                  interruptions={interruptions}
-                  isDarkMode={isDarkMode}
                 />
               )}
 

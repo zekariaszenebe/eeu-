@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, ShieldAlert, History, Zap, User, AlertTriangle, ChevronLeft, ChevronRight, LogOut, MapPin, Map as MapIcon, Phone, Calculator, Gauge, Headset, ShieldCheck, UserCheck, FileSpreadsheet, MessageSquare } from 'lucide-react';
+import { LayoutDashboard, ShieldAlert, History, Zap, User, AlertTriangle, ChevronLeft, ChevronRight, LogOut, MapPin, Phone, Calculator, Gauge, Headset, ShieldCheck, UserCheck, FileSpreadsheet, MessageSquare } from 'lucide-react';
 import EEULogo from './EEULogo';
 import { UserRole, TeamLeaderUser } from '../types';
 
@@ -45,7 +45,6 @@ export default function Sidebar({
 
   const navItems: NavItem[] = [
     { id: 'dashboard', name: 'Interruption Dashboard', icon: LayoutDashboard },
-    { id: 'map', name: 'Map', icon: MapIcon },
     ...(canManageFeed ? [{ id: 'admin', name: feedTabName, icon: ShieldAlert }] : []),
     { id: 'sms-ticker', name: 'SMS Ticket Generator', icon: MessageSquare },
     { id: 'calculator', name: 'Bill Calculator', icon: Calculator },
