@@ -97,6 +97,9 @@ const ADDIS_SUB_CITIES: SubCityZone[] = [
       'winget', 'ዊንጌት', 'pasteur', 'pastor', 'ፓስተር', 'paulos', 'ጳውሎስ',
       'askko', 'asko', 'አስኮ', 'rufale', 'ሩፋኤል', 'semen mazegaja', 'ሰሜን ማዘጋጃ',
       'dil ber', 'ድል በር', 'sheger park', 'guskuam', 'ጉስቋም', 'menen', 'መነን',
+      'shegole', 'shg-', 'ሸጎሌ', 'sansusi', 'ሳንሱሲ', 'awolia', 'አወልያ',
+      'birchiko', 'ብርጭቆ', 'enkulal fabrika', 'እንቁላል ፋብሪካ', 'doro tera', 'ዶሮ ተራ',
+      'lazarist', 'ላዛሪስት', 'space science', 'ስፔስ ሳይንስ', 'atena tera', 'አጠና ተራ',
     ],
   },
   {
@@ -109,11 +112,13 @@ const ADDIS_SUB_CITIES: SubCityZone[] = [
       '373.2,175.4 390.9,166.2 384.4,154.4 388.1,141 379.1,122.1 390.4,101.1 406.2,99.6 424,81.7 427.3,88.5 429.9,96.1 431.3,97.7 433.4,98.9 434.9,99.3 441.6,104.5 447.5,100.9 449.1,106.8 477.2,81.1 496.1,87.3 504.3,90.3 523.7,231 465.1,232.4 407.4,249.8 414.9,240.8 407.9,235 399.8,237.3 395.6,229.8 382.2,224.7 395.7,217.8 393.4,211.8 393.7,211.9 397.7,213 403.4,214.6 412.7,209.5 411.3,187.6 401.9,188.6',
     center: { x: 454, y: 168 },
     keywords: [
-      'yeka', 'የካ', 'ferensay', 'ፈረንሳይ', 'bella', 'bel-', 'ቤላ',
+      'yeka', 'የካ', 'ferensay', 'ፈረንሳይ', 'gurara', 'ጉራራ', 'bella', 'bel-', 'ቤላ',
       'kotebe', 'cotebe', 'cot-', 'ኮተቤ', 'signal', 'ሲግናል', 'megenagna', 'መገናኛ',
       'kara', 'ካራ', 'wosen', 'ወሰን', 'lam beret', 'ላም በረት', 'shola', 'ሾላ',
       'kebena', 'ቀበና', 'aware', 'አዋሬ', 'balderas', 'ባልደራስ', 'minilik', 'ሚኒሊክ',
       'chaka', 'chk-', 'dinberwa', 'ድንበሯ', 'british embassy', 'salite mihret', 'ሳሊተ ምህረት',
+      'lem hotel', 'ለም ሆቴል', 'yeka michael', 'የካ ሚካኤል', 'enderase', 'እንደራሴ',
+      'misrak', 'ምስራቅ', 'ararat', 'አራራት', 'wondirad', 'ወንዲራድ',
     ],
   },
   {
@@ -127,9 +132,11 @@ const ADDIS_SUB_CITIES: SubCityZone[] = [
     center: { x: 616, y: 266 },
     keywords: [
       'lemi kura', 'lemikura', 'ለሚ ኩራ', 'ለሚኩራ', 'cmc', 'ሲኤምሲ', 'ሲኤም ሲ',
-      'ayat', 'ayt-', 'አያት', 'meri', 'መሪ', 'summit', 'ሰሚት', 'arabsa', 'arb-',
+      'ayat', 'ayt-', 'አያት', 'meri', 'መሪ', 'summit', 'ሰሚት', 'arabsa', 'arb-', 'blm-',
       'አራብሳ', 'beshale', 'በሻሌ', 'figa', 'ፊጋ', 'jakros', 'ጃክሮስ', 'civil service',
-      'ሲቪል ሰርቪስ', 'gurd shola', 'ጉርድ ሾላ', 'ict park', 'አይ ሲ ቲ',
+      'ሲቪል ሰርቪስ', 'gurd shola', 'ጉርድ ሾላ', 'ict park', 'አይ ሲ ቲ', 'abado', 'አባዶ',
+      'tafo', 'ጣፎ', 'mekedonia', 'መቄዶንያ', 'sunshine', 'ሰንሻይን', 'diaspora', 'ዲያስፓራ',
+      'fiyel bet', 'ፍየል ቤት', 'ፊየል ቤት', 'meri loke', 'መሪ ሉቄ', 'goro selassie', 'ጎሮ ስላሴ',
     ],
   },
   {
@@ -147,7 +154,8 @@ const ADDIS_SUB_CITIES: SubCityZone[] = [
       '5 kilo', '5ኪሎ', '6 kilo', '6ኪሎ', 'sidist kilo', 'janmeda', 'ጃንሜዳ',
       'dejach wube', 'ደጃች ውቤ', 'afincho ber', 'አፍንጮ በር', 'churchill', 'ቸርቸል',
       'adwa', 'አድዋ', 'yohannes', 'ዮሀንስ', 'ras desta', 'ራስ ደስታ', 'abune petros',
-      'adn-', 'addis north', 'tourist hotel', 'ገንፍሌ',
+      'adn-', 'addis north', 'tourist hotel', 'ቱሪስት ሆቴል', 'ገንፍሌ', 'yekatit 12', 'የካቲት 12',
+      'parliament', 'ፓርላማ', 'cathedral', 'ካቴድራል', 'taytu', 'ጣይቱ', 'giorgis', 'ጊዮርጊስ',
     ],
   },
   {
@@ -166,6 +174,7 @@ const ADDIS_SUB_CITIES: SubCityZone[] = [
       'abinet', 'አብነት', 'sebategna', 'ሰባተኛ', 'amanuel', 'አማኑኤል', 'አማኔኤል',
       'kuas meda', 'ኳስ ሜዳ', 'anwar', 'አንዋር', 'gojam berenda', 'ጎጃም በረንዳ',
       'abebe bikila', 'አበበ ቢቂላ', 'addisu michael', 'አዲሱ ሚካኤል',
+      'habte giorgis', 'ሀብተ ጎርጊስ', 'chid tera', 'ጭድ ተራ', 'bikil tera', 'ብቅል ተራ',
     ],
   },
   {
@@ -184,6 +193,7 @@ const ADDIS_SUB_CITIES: SubCityZone[] = [
       'weyra', 'ወይራ', 'zenebework', 'ዘነበወርቅ', 'augusta', 'አውጉስታ', 'አጉስታ',
       'tor hailoch', 'torhailoch', 'ጦርሀይሎች', 'ጦር ሀይሎች', 'lomi meda', 'ሎሚ ሜዳ',
       'filipos', 'ፊሊፖስ', 'adw-', 'addis west', 'karl', 'yeshi debele', 'የሺ ደበሌ',
+      'silte sefer', 'ስልጤ ሰፈር', 'weybela', 'ወይብላ', 'kara kore', 'ካራቆ', 'repi', 'ረጲ', 'tezina', 'ተዘንአ',
     ],
   },
   {
@@ -202,6 +212,7 @@ const ADDIS_SUB_CITIES: SubCityZone[] = [
       'tikur anbessa', 'black line', 'bll-', 'ጥቁር አንበሳ', 'coca', 'ኮካ',
       'senga tera', 'ሰንጋ ተራ', 'geja', 'ጌጃ', 'tegba', 'ተግባረድ', 'mechare', 'መቻሬ',
       'african union', 'አፍሪካ ሕብረት', 'adc-11', 'biherawi', 'ብሔራዊ',
+      'gola', 'ጎላ', 'wabe shebele', 'ዋቢ ሽበሌ', 'tobacco', 'ትንባሆ', 'bgi', 'ቢጂ ኤ',
     ],
   },
   {
@@ -219,8 +230,10 @@ const ADDIS_SUB_CITIES: SubCityZone[] = [
       'legehar', 'ለገሐር', 'ለገሀር', 'kazanchis', 'kasanchis', 'ካሳንቺስ', 'ካዛንቺስ',
       'urael', 'ኡራኤል', 'olympia', 'ኦሎምፒያ', 'wolo sefer', 'ወሎ ሰፈር', 'denbel', 'ደንበል',
       'flamingo', 'ፍላሚንጎ', 'gotera', 'ጎተራ', 'estifanos', 'እስጢፋኖስ', 'ghion', 'ጊዮን',
-      'hilton', 'sheraton', 'ሸራትን', 'eca', 'ኢሲኤ', 'bambis', 'kera', 'ቄራ',
-      'addis center', 'adc-', 'bulgaria', 'ቡልጋሪያ', '22', 'atlas', 'አትላስ',
+      'hilton', 'ሂልተን', 'sheraton', 'ሸራትን', 'eca', 'ኢሲኤ', 'bambis', 'ባምቢስ',
+      'kera', 'ቄራ', 'addis center', 'adc-', 'bulgaria', 'ቡልጋሪያ', '22', 'atlas', 'አትላስ',
+      'genet hotel', 'ገነት ሆቴል', 'global', 'ግሎባል', 'riche', 'ሪቼ', 'meskel flower', 'መስቀል ፍላውር',
+      'ramada', 'ራማዳ', 'nif-01', 'nif-03', 'nif-04', 'nif-06', 'nif-07',
     ],
   },
   {
@@ -236,7 +249,11 @@ const ADDIS_SUB_CITIES: SubCityZone[] = [
       'bole', 'ቦሌ', 'medhanialem', 'መድሀኒአለም', 'rwanda', 'ሩዋንዳ', 'goro', 'ጎሮ',
       'bulbula', 'ቡልቡላ', 'airport', 'አየር መንገድ', 'hayahulet', 'chichinia', 'ቺቺኒያ',
       'ade-', 'addis east', 'gerji', 'ገርጂ', 'bole michael', 'ቦሌ ሚካኤል',
-      '24', 'millennium', 'jackros', 'shewa dabo', 'ethio china', 'bolemichael',
+      '24', 'millennium', 'ሚሊኒየም', 'shewa dabo', 'ethio china', 'bolemichael',
+      'weregenu', 'wer-', 'imperial', 'ኢምፔሪያል', 'skylight', 'ስካይ ላይት',
+      'century mall', 'ሴንቸሪ ሞል', 'korea hospital', 'ኮሪያ ሆስፒታል', 'anbessa garage', 'አንበሳ ጋራጅ',
+      'unity university', 'ዮኒቲ ዩኒቨርስቲ', 'aviation', 'አቬሽን', 'washington hospital', 'ዋሽንግተን ሆስፒታል',
+      'gorgorios', 'ጎርጎሪዎስ', 'nif-09', 'yere', 'የረር',
     ],
   },
   {
@@ -250,10 +267,11 @@ const ADDIS_SUB_CITIES: SubCityZone[] = [
     center: { x: 298, y: 396 },
     keywords: [
       'nifas silk', 'nefas silk', 'lafto', 'ንፋስ ስልክ', 'ላፍቶ', 'sar bet', 'sarbet', 'ሳር ቤት', 'ሳርቤት',
-      'mekanisa', 'መካኒሳ', 'gofa', 'gof-', 'ጎፋ', 'jemo', 'ጀሞ', 'lebu', 'ለቡ',
+      'mekanisa', 'mek-', 'መካኒሳ', 'gofa', 'gof-', 'ጎፋ', 'jemo', 'ጀሞ', 'lebu', 'ለቡ',
       'hana mariam', 'ሃና ማርያም', 'ሀና ማርያም', 'bisrate gabriel', 'ብስራተ ገብርኤል',
-      'german square', 'ጀርመን አደባባይ', 'mebrat hail', 'መብራት ሀይል', 'karl square',
-      'abo mazoria', 'sefereselam', 'ertale', 'south region', 'global hotel',
+      'german square', 'ጀርመን አደባባይ', 'mebrat hail', 'መብራት ሀይል', 'karl square', 'ካርል',
+      'abo mazoria', 'sefereselam', 'ertale', 'south region', 'varnero', 'ቫርኔሮ',
+      'garment', 'ጋርመንት', 'kore', 'ቆሬ', 'bihere tsige', 'ብሔረ ጽጌ', 'buna board', 'ቡና ቦርድ', 'nif-08',
     ],
   },
   {
@@ -266,10 +284,12 @@ const ADDIS_SUB_CITIES: SubCityZone[] = [
       '595.3,424.7 582.6,424.9 578.9,424.5 553.5,412.6 548.5,417.9 533,418.6 527,425.4 510.7,426.9 502.6,422 502.2,412.6 470.9,409.5 465.9,402.8 455.7,413.5 438.4,422.2 431.3,420.8 415.3,433.9 404.8,427.6 404.9,419.1 394.8,408 397,395.1 405.1,388.2 387.9,373 376.1,374.2 375.4,390.1 365.7,397.4 367.4,410.5 359.7,428.1 364.1,430.2 357.4,437.9 360.9,443.1 356.3,453.1 345.5,458.7 345.8,468.7 335.9,488.5 338.6,496.7 328.3,514.6 326.6,532 339.3,533.6 337.2,538.1 338.3,539.3 340.1,541.4 332.3,556.8 330.4,562.7 330.1,567.9 341.3,568.1 335.8,588.5 336.5,602.9 356.9,609.9 356.5,619 362.2,627.2 374.2,626.3 397.6,621.1 399.1,618.3 403.2,612.2 407.4,627.5 413.9,628.7 417.9,632.8 413.9,652 413.7,656.7 421.6,671.2 445.9,668.8 452.9,671.4 457.5,673.7 462.1,676 494.4,658.3 506.3,666.3 505.1,654.5 505.2,654.4 522,655.5 519.3,631 533.8,588.5 533.8,588.5 528,578.5 521.3,567.7 521.3,565.8 522.3,564.5 523.2,562.7 542,556.1 544.9,556.8 560.3,563.8 575.3,563.4 589.2,559.2 601.9,554.8 614.7,556.7 624.8,580.9 629.1,578.6 628.8,561.6 637.3,543.7 646.9,525.9 635.3,510.5 651.4,472.3 601.7,435.4',
     center: { x: 478, y: 526 },
     keywords: [
-      'akaki', 'aka.', 'አቃቂ', 'kality', 'kaliti', 'ቃሊቲ', 'saris', 'ሳሪስ',
-      'tulu dimtu', 'ቱሉ ዲምቱ', 'kilinto', 'ቂሊንጦ', 'koye', 'ኮዬ', 'gelan', 'gel-', 'ገላን',
-      'korke', 'ቆርኬ', 'crown', 'ክራውን', 'abo', 'kality prison', 'worku sefer',
-      'saris abo', 'akaki kality', 'akaki-kality', 'coffee city', 'ኮፊ ሲቲ',
+      'akaki', 'aka.', 'አቃቂ', 'kality', 'kaliti', 'kal ', 'kal-', 'ቃሊቲ', 'saris', 'ሳሪስ',
+      'tulu dimtu', 'ቱሉ ዲምቱ', 'kilinto', 'kln-', 'ቂሊንጦ', 'koye', 'koy-', 'ኮዬ', 'gelan', 'gel-', 'ገላን',
+      'korke', 'ቆርኬ', 'crown', 'ክራውን', 'abo', 'kality prison', 'worku sefer', 'ወርቁ ሰፈር',
+      'saris abo', 'ሳሪስ አቦ', 'akaki kality', 'akaki-kality', 'coffee city', 'ኮፊ ሲቲ',
+      '93 mazoria', '93 ማዞሪያ', 'fafa', 'ፋፋ', 'cheralia', 'ቼራሊያ', 'aastu', 'nif-10',
+      'beijing hospital', 'ቤጂንግ ሆስፒታል', 'salo', 'ሳሎ', 'cadisco', 'ካዲስኮ',
     ],
   },
 ];
@@ -292,67 +312,120 @@ function isShegerOutage(item: FeederInterruption): boolean {
 }
 
 const AREA_ANCHORS: Array<{ keywords: string[]; zoneId: string; x: number; y: number }> = [
-  { keywords: ['shiro meda', 'ሽሮ ሜዳ', 'guskuam', 'ጉስቋም', 'entoto', 'እንጦቶ'], zoneId: 'gullele', x: 369.5, y: 126.3 },
+  // Gullele
+  { keywords: ['entoto', 'እንጦቶ', 'lazarist', 'ላዛሪስት', 'space science', 'ስፔስ ሳይንስ'], zoneId: 'gullele', x: 362.4, y: 107.3 },
+  { keywords: ['shiro meda', 'ሽሮ ሜዳ', 'guskuam', 'ጉስቋም'], zoneId: 'gullele', x: 369.5, y: 126.3 },
   { keywords: ['addisu gebeya', 'addis gebya', 'adg-', 'semen mazegaja', 'ሰሜን ማዘጋጃ', 'rufale', 'ሩፋኤል'], zoneId: 'gullele', x: 324.8, y: 147.7 },
-  { keywords: ['winget', 'ዊንጌት', 'asko', 'አስኮ'], zoneId: 'gullele', x: 263.7, y: 154.9 },
-  { keywords: ['pastor', 'pasteur', 'ፓስተር', 'paulos', 'ጳውሎስ'], zoneId: 'gullele', x: 294.2, y: 169.2 },
   { keywords: ['kechene', 'ቀጨኔ'], zoneId: 'gullele', x: 353, y: 152.5 },
-  { keywords: ['ferensay', 'ፈረንሳይ'], zoneId: 'yeka', x: 411.8, y: 150.1 },
-  { keywords: ['bella', 'bel-', 'ቤላ'], zoneId: 'yeka', x: 428.3, y: 173.9 },
-  { keywords: ['kotebe', 'cotebe', 'cot-', 'ኮተቤ', 'wosen', 'ወሰን'], zoneId: 'yeka', x: 503.5, y: 195.4 },
-  { keywords: ['megenagna', 'መገናኛ', 'shola', 'ሾላ', 'dinberwa', 'ድንበሯ'], zoneId: 'yeka', x: 465.9, y: 231.1 },
-  { keywords: ['signal', 'ሲግናል', 'aware', 'አዋሬ', 'kebena', 'ቀበና', 'balderas', 'ባልደራስ'], zoneId: 'yeka', x: 423.6, y: 216.8 },
+  { keywords: ['asko', 'አስኮ', 'sansusi', 'ሳንሱሲ', 'birchiko', 'ብርጭቆ', 'awolia', 'አወልያ'], zoneId: 'gullele', x: 235.4, y: 147.7 },
+  { keywords: ['winget', 'ዊንጌት', 'atena tera', 'አጠና ተራ'], zoneId: 'gullele', x: 263.7, y: 154.9 },
+  { keywords: ['shegole', 'shg-', 'ሸጎሌ'], zoneId: 'gullele', x: 268.4, y: 164.4 },
+  { keywords: ['pastor', 'pasteur', 'ፓስተር', 'paulos', 'ጳውሎስ', 'enkulal fabrika', 'እንቁላል ፋብሪካ'], zoneId: 'gullele', x: 294.2, y: 169.2 },
+
+  // Yeka
+  { keywords: ['ferensay', 'ፈረንሳይ', 'gurara', 'ጉራራ'], zoneId: 'yeka', x: 411.8, y: 150.1 },
+  { keywords: ['bella', 'bel-', 'ቤላ', 'minilik', 'ሚኒሊክ'], zoneId: 'yeka', x: 428.3, y: 173.9 },
   { keywords: ['kara', 'ካራ'], zoneId: 'yeka', x: 531.7, y: 164.4 },
-  { keywords: ['cmc', 'ሲኤምሲ', 'ሲኤም ሲ', 'civil service', 'ሲቪል ሰርቪስ'], zoneId: 'lemi-kura', x: 560, y: 228.7 },
+  { keywords: ['kotebe', 'cotebe', 'cot-', 'ኮተቤ', 'wosen', 'ወሰን', 'lam beret', 'ላም በረት', 'wondirad', 'ወንዲራድ'], zoneId: 'yeka', x: 503.5, y: 195.4 },
+  { keywords: ['yeka michael', 'የካ ሚካኤል', 'dinberwa', 'ድንበሯ'], zoneId: 'yeka', x: 449.4, y: 204.9 },
+  { keywords: ['aware', 'አዋሬ', 'kebena', 'ቀበና'], zoneId: 'yeka', x: 404.8, y: 209.6 },
+  { keywords: ['signal', 'ሲግናል', 'balderas', 'ባልደራስ', 'enderase', 'እንደራሴ'], zoneId: 'yeka', x: 423.6, y: 216.8 },
+  { keywords: ['megenagna', 'መገናኛ', 'shola', 'ሾላ', 'lem hotel', 'ለም ሆቴል'], zoneId: 'yeka', x: 465.9, y: 231.1 },
+
+  // Lemi Kura
+  { keywords: ['abado', 'አባዶ', 'yeka abado', 'የካ አባዶ'], zoneId: 'lemi-kura', x: 560, y: 145.4 },
+  { keywords: ['ayat 49', 'አያት 49', 'tafo', 'ጣፎ', 'mekedonia', 'መቄዶንያ'], zoneId: 'lemi-kura', x: 668.1, y: 216.8 },
   { keywords: ['ayat', 'ayt-', 'አያት'], zoneId: 'lemi-kura', x: 635.2, y: 228.7 },
-  { keywords: ['meri', 'መሪ'], zoneId: 'lemi-kura', x: 607, y: 250.1 },
-  { keywords: ['summit', 'ሰሚት'], zoneId: 'lemi-kura', x: 590.5, y: 288.2 },
-  { keywords: ['arabsa', 'arb-', 'አራብሳ', 'beshale', 'በሻሌ', 'ict park', 'አይ ሲ ቲ'], zoneId: 'lemi-kura', x: 661.1, y: 345.3 },
-  { keywords: ['figa', 'ፊጋ', 'gurd shola', 'ጉርድ ሾላ'], zoneId: 'lemi-kura', x: 555.3, y: 266.8 },
-  { keywords: ['piassa', 'piasa', 'ፒያሳ', 'ፒያሣ', 'dejach wube', 'ደጃች ውቤ', 'churchill', 'ቸርቸል'], zoneId: 'arada', x: 348.3, y: 200.1 },
-  { keywords: ['4 kilo', '4ኪሎ', 'arat kilo', '5 kilo', '5ኪሎ', 'janmeda', 'ጃንሜዳ'], zoneId: 'arada', x: 374.2, y: 200.1 },
-  { keywords: ['6 kilo', '6ኪሎ', 'sidist kilo', 'menen', 'መነን', 'afincho ber', 'አፍንጮ በር'], zoneId: 'arada', x: 369.5, y: 173.9 },
-  { keywords: ['merkato', 'mercato', 'መርካቶ', 'abinet', 'አብነት', 'sebategna', 'ሰባተኛ', 'anwar', 'አንዋር'], zoneId: 'addis-ketema', x: 315.4, y: 204.9 },
-  { keywords: ['autobus tera', 'አውቶብስ ተራ', 'mesalemiya', 'መሳለሚያ', 'ማሰለሚያ', 'amanuel', 'አማኑኤል', 'ehil berenda', 'እህል በረንዳ'], zoneId: 'addis-ketema', x: 298.9, y: 197.7 },
-  { keywords: ['kolfe', 'ኮልፌ', '18 mazoria', '18 ማደያ', 'lomi meda', 'ሎሚ ሜዳ'], zoneId: 'kolfe-keranio', x: 237.8, y: 221.5 },
-  { keywords: ['bethel', 'betel', 'ቤተል', 'keranio', 'ቀራንዮ'], zoneId: 'kolfe-keranio', x: 211.9, y: 273.9 },
-  { keywords: ['alem bank', 'alembank', 'alb-', 'አለም ባንክ', 'ዓለም ባንክ', 'anfo', 'anf-', 'አንፎ'], zoneId: 'kolfe-keranio', x: 193.1, y: 304.9 },
-  { keywords: ['ayer tena', 'ayertena', 'አየር ጤና', 'zenebework', 'ዘነበወርቅ'], zoneId: 'kolfe-keranio', x: 228.4, y: 319.2 },
-  { keywords: ['tor hailoch', 'torhailoch', 'ጦርሀይሎች', 'ጦር ሀይሎች'], zoneId: 'kolfe-keranio', x: 266, y: 264.4 },
-  { keywords: ['weyra', 'ወይራ', 'augusta', 'አውጉስታ', 'አጉስታ'], zoneId: 'kolfe-keranio', x: 221.3, y: 252.5 },
+  { keywords: ['cmc', 'ሲኤምሲ', 'ሲኤም ሲ', 'civil service', 'ሲቪል ሰርቪስ', 'sunshine', 'ሰንሻይን'], zoneId: 'lemi-kura', x: 560, y: 228.7 },
+  { keywords: ['meri', 'መሪ', 'meri loke', 'መሪ ሉቄ'], zoneId: 'lemi-kura', x: 607, y: 250.1 },
+  { keywords: ['figa', 'ፊጋ', 'gurd shola', 'ጉርድ ሾላ', 'jakros', 'ጃክሮስ'], zoneId: 'lemi-kura', x: 536, y: 264.2 },
+  { keywords: ['summit', 'ሰሚት', 'fiyel bet', 'ፍየል ቤት', 'ፊየል ቤት'], zoneId: 'lemi-kura', x: 590.5, y: 288.2 },
+  { keywords: ['arabsa', 'arb-', 'blm-', 'አራብሳ', 'beshale', 'በሻሌ', 'ict park', 'አይ ሲ ቲ', 'diaspora', 'ዲያስፓራ'], zoneId: 'lemi-kura', x: 661.1, y: 345.3 },
+
+  // Arada
+  { keywords: ['6 kilo', '6ኪሎ', 'sidist kilo', 'menen', 'መነን', 'afincho ber', 'አፍንጮ በር', 'yekatit 12', 'የካቲት 12'], zoneId: 'arada', x: 369.5, y: 173.9 },
+  { keywords: ['piassa', 'piasa', 'ፒያሳ', 'ፒያሣ', 'dejach wube', 'ደጃች ውቤ', 'churchill', 'ቸርቸል', 'giorgis', 'ጊዮርጊስ', 'adwa', 'አድዋ'], zoneId: 'arada', x: 348.3, y: 200.1 },
+  { keywords: ['4 kilo', '4ኪሎ', 'arat kilo', '5 kilo', '5ኪሎ', 'janmeda', 'ጃንሜዳ', 'parliament', 'ፓርላማ', 'tourist hotel', 'ቱሪስት ሆቴል'], zoneId: 'arada', x: 374.2, y: 200.1 },
+
+  // Addis Ketema
+  { keywords: ['autobus tera', 'አውቶብስ ተራ', 'mesalemiya', 'መሳለሚያ', 'ማሰለሚያ', 'amanuel', 'አማኑኤል', 'ehil berenda', 'እህል በረንዳ', 'abebe bikila', 'አበበ ቢቂላ'], zoneId: 'addis-ketema', x: 298.9, y: 197.7 },
+  { keywords: ['merkato', 'mercato', 'መርካቶ', 'abinet', 'አብነት', 'sebategna', 'ሰባተኛ', 'anwar', 'አንዋር', 'gojam berenda', 'ጎጃም በረንዳ'], zoneId: 'addis-ketema', x: 315.4, y: 204.9 },
+
+  // Kolfe Keranio
+  { keywords: ['kolfe', 'ኮልፌ', '18 mazoria', '18 ማደያ', 'ኮልፌ 18', 'lomi meda', 'ሎሚ ሜዳ', 'filipos', 'ፊሊፖስ'], zoneId: 'kolfe-keranio', x: 237.8, y: 221.5 },
+  { keywords: ['weyra', 'ወይራ', 'augusta', 'አውጉስታ', 'አጉስታ', 'tezina', 'ተዘንአ'], zoneId: 'kolfe-keranio', x: 221.3, y: 252.5 },
+  { keywords: ['tor hailoch', 'torhailoch', 'ጦርሀይሎች', 'ጦር ሀይሎች', 'karl', 'ካርል'], zoneId: 'kolfe-keranio', x: 266, y: 264.4 },
+  { keywords: ['bethel', 'betel', 'ቤተል', 'keranio', 'ቀራንዮ', 'ቀራኒዮ', 'yeshi debele', 'የሺ ደበሌ'], zoneId: 'kolfe-keranio', x: 211.9, y: 273.9 },
+  { keywords: ['alem bank', 'alembank', 'alb-', 'አለም ባንክ', 'ዓለም ባንክ', 'anfo', 'anf-', 'አንፎ', 'silte sefer', 'ስልጤ ሰፈር', 'weybela', 'ወይብላ'], zoneId: 'kolfe-keranio', x: 193.1, y: 304.9 },
+  { keywords: ['ayer tena', 'ayertena', 'አየር ጤና', 'zenebework', 'ዘነበወርቅ', 'kara kore', 'ካራቆ', 'repi', 'ረጲ'], zoneId: 'kolfe-keranio', x: 228.4, y: 319.2 },
+
+  // Lideta
+  { keywords: ['teklehaimanot', 'teklehaymanot', 'ተክለሀይማኖት', 'ተክለሃይማኖት', 'ተ/ኃይማኖት', 'tikur anbessa', 'ጥቁር አንበሳ', 'gola', 'ጎላ', 'wabe shebele', 'ዋቢ ሽበሌ'], zoneId: 'lideta', x: 331.9, y: 223.9 },
+  { keywords: ['senga tera', 'ሰንጋ ተራ', 'geja', 'ጌጃ'], zoneId: 'lideta', x: 331.9, y: 235.8 },
   { keywords: ['lideta', 'ልደታ', 'balcha', 'ባልቻ', 'coca', 'ኮካ', 'mechare', 'መቻሬ'], zoneId: 'lideta', x: 306, y: 247.7 },
-  { keywords: ['mexico', 'meksico', 'ሜክሲኮ', 'senga tera', 'ሰንጋ ተራ'], zoneId: 'lideta', x: 329.5, y: 254.9 },
-  { keywords: ['teklehaimanot', 'teklehaymanot', 'ተክለሀይማኖት', 'ተክለሃይማኖት', 'tikur anbessa', 'ጥቁር አንበሳ'], zoneId: 'lideta', x: 331.9, y: 223.9 },
-  { keywords: ['meskel', 'መስቀል', 'legehar', 'ለገሐር', 'ለገሀር', 'estifanos', 'እስጢፋኖስ'], zoneId: 'kirkos', x: 369.5, y: 254.9 },
-  { keywords: ['kazanchis', 'kasanchis', 'ካሳንቺስ', 'ካዛንቺስ'], zoneId: 'kirkos', x: 385.9, y: 240.6 },
-  { keywords: ['urael', 'ኡራኤል', 'atlas', 'አትላስ', '22'], zoneId: 'kirkos', x: 400.1, y: 254.9 },
-  { keywords: ['wolo sefer', 'ወሎ ሰፈር', 'olympia', 'ኦሎምፒያ', 'denbel', 'ደንበል', 'cherkos', 'ጨርቆስ'], zoneId: 'kirkos', x: 383.6, y: 285.8 },
-  { keywords: ['gotera', 'ጎተራ', 'kera', 'ቄራ', 'bulgaria', 'ቡልጋሪያ'], zoneId: 'kirkos', x: 367.1, y: 316.8 },
-  { keywords: ['bole', 'ቦሌ', 'medhanialem', 'መድሀኒአለም', 'rwanda', 'ሩዋንዳ', 'airport', 'አየር መንገድ', 'chichinia', 'ቺቺኒያ'], zoneId: 'bole', x: 440, y: 290.6 },
-  { keywords: ['gerji', 'ገርጂ', '24', 'jackros', 'ጃክሮስ'], zoneId: 'bole', x: 491.8, y: 276.3 },
-  { keywords: ['goro', 'ጎሮ'], zoneId: 'bole', x: 522.3, y: 314.4 },
-  { keywords: ['bulbula', 'ቡልቡላ', 'bole michael', 'ቦሌ ሚካኤል'], zoneId: 'bole', x: 435.3, y: 373.9 },
+  { keywords: ['mexico', 'meksico', 'ሜክሲኮ', 'tegbared', 'ተግባረድ', 'bgi', 'ቢጂ ኤ'], zoneId: 'lideta', x: 329.5, y: 254.9 },
+  { keywords: ['african union', 'አፍሪካ ሕብረት', 'tobacco', 'ትንባሆ'], zoneId: 'lideta', x: 322.4, y: 281.1 },
+
+  // Kirkos
+  { keywords: ['kazanchis', 'kasanchis', 'ካሳንቺስ', 'ካዛንቺስ', 'hilton', 'ሂልተን', 'eca', 'ኢሲኤ'], zoneId: 'kirkos', x: 385.9, y: 240.6 },
+  { keywords: ['22', 'urael', 'ኡራኤል', 'atlas', 'አትላስ', 'bambis', 'ባምቢስ'], zoneId: 'kirkos', x: 400.1, y: 254.9 },
+  { keywords: ['meskel', 'መስቀል', 'legehar', 'ለገሐር', 'ለገሀር', 'estifanos', 'እስጢፋኖስ', 'ghion', 'ጊዮን'], zoneId: 'kirkos', x: 369.5, y: 254.9 },
+  { keywords: ['cherkos', 'ጨርቆስ', 'ቂርቆስ', 'kirkos', 'olympia', 'ኦሎምፒያ', 'flamingo', 'ፍላሚንጎ', 'denbel', 'ደንበል'], zoneId: 'kirkos', x: 378.9, y: 273.9 },
+  { keywords: ['wolo sefer', 'ወሎ ሰፈር', 'ramada', 'ራማዳ', 'meskel flower', 'መስቀል ፍላውር'], zoneId: 'kirkos', x: 383.6, y: 285.8 },
+  { keywords: ['gotera', 'ጎተራ', 'kera', 'ቄራ', 'bulgaria', 'ቡልጋሪያ', 'genet hotel', 'ገነት ሆቴል', 'global', 'ግሎባል', 'riche', 'ሪቼ'], zoneId: 'kirkos', x: 367.1, y: 316.8 },
+
+  // Bole
+  { keywords: ['weregenu', 'wer-', 'imperial', 'ኢምፔሪያል', 'anbessa garage', 'አንበሳ ጋራጅ', 'korea hospital', 'ኮሪያ ሆስፒታል'], zoneId: 'bole', x: 470.6, y: 259.6 },
+  { keywords: ['24', 'chichinia', 'ቺቺኒያ', 'atlas', 'አትላስ'], zoneId: 'bole', x: 435.3, y: 266.8 },
+  { keywords: ['gerji', 'ገርጂ', 'unity university', 'ዮኒቲ ዩኒቨርስቲ', 'century mall', 'ሴንቸሪ ሞል'], zoneId: 'bole', x: 491.8, y: 276.3 },
+  { keywords: ['bole', 'ቦሌ', 'medhanialem', 'መድሀኒአለም', 'rwanda', 'ሩዋንዳ', 'millennium', 'ሚሊኒየም', 'skylight', 'ስካይ ላይት', 'airport', 'አየር መንገድ'], zoneId: 'bole', x: 440, y: 290.6 },
+  { keywords: ['goro', 'ጎሮ', 'yere', 'የረር'], zoneId: 'bole', x: 522.3, y: 314.4 },
+  { keywords: ['bole michael', 'ቦሌ ሚካኤል', 'washington hospital', 'ዋሽንግተን ሆስፒታል', 'gorgorios', 'ጎርጎሪዎስ'], zoneId: 'bole', x: 418.9, y: 326.3 },
+  { keywords: ['bulbula', 'ቡልቡላ'], zoneId: 'bole', x: 435.3, y: 373.9 },
+
+  // Nifas Silk-Lafto
   { keywords: ['sar bet', 'sarbet', 'ሳር ቤት', 'ሳርቤት', 'bisrate gabriel', 'ብስራተ ገብርኤል'], zoneId: 'nifas-silk', x: 313, y: 295.4 },
-  { keywords: ['mekanisa', 'መካኒሳ', 'german square', 'ጀርመን አደባባይ'], zoneId: 'nifas-silk', x: 291.9, y: 328.7 },
-  { keywords: ['gofa', 'gof-', 'ጎፋ'], zoneId: 'nifas-silk', x: 336.6, y: 345.3 },
+  { keywords: ['mekanisa', 'mek-', 'መካኒሳ', 'german square', 'ጀርመን አደባባይ', 'kore', 'ቆሬ'], zoneId: 'nifas-silk', x: 291.9, y: 328.7 },
+  { keywords: ['gofa', 'gof-', 'ጎፋ', 'buna board', 'ቡና ቦርድ'], zoneId: 'nifas-silk', x: 336.6, y: 345.3 },
+  { keywords: ['jemo 1', 'ጀሞ 1', 'varnero', 'ቫርኔሮ'], zoneId: 'nifas-silk', x: 273.1, y: 362 },
+  { keywords: ['jemo 2', 'ጀሞ 2', 'jemo 3', 'ጀሞ 3'], zoneId: 'nifas-silk', x: 240.1, y: 402.5 },
   { keywords: ['jemo', 'ጀሞ'], zoneId: 'nifas-silk', x: 256.6, y: 378.7 },
-  { keywords: ['lebu', 'ለቡ', 'hana mariam', 'ሃና ማርያም', 'ሀና ማርያም'], zoneId: 'nifas-silk', x: 298.9, y: 395.3 },
-  { keywords: ['lafto', 'ላፍቶ', 'mebrat hail', 'መብራት ሀይል'], zoneId: 'nifas-silk', x: 338.9, y: 385.8 },
-  { keywords: ['saris', 'ሳሪስ'], zoneId: 'akaki-kality', x: 381.2, y: 404.9 },
-  { keywords: ['kaliti', 'kality', 'ቃሊቲ'], zoneId: 'akaki-kality', x: 393, y: 521.5 },
-  { keywords: ['tulu dimtu', 'ቱሉ ዲምቱ', 'kilinto', 'ቂሊንጦ', 'koye', 'ኮዬ'], zoneId: 'akaki-kality', x: 501.2, y: 550.1 },
-  { keywords: ['akaki', 'aka.', 'አቃቂ'], zoneId: 'akaki-kality', x: 428.3, y: 595.3 },
-  { keywords: ['gelan', 'gel-', 'ገላን'], zoneId: 'akaki-kality', x: 527, y: 623.9 },
+  { keywords: ['lafto', 'ላፍቶ', 'mebrat hail', 'መብራት ሀይል', 'bihere tsige', 'ብሔረ ጽጌ'], zoneId: 'nifas-silk', x: 338.9, y: 385.8 },
+  { keywords: ['lebu', 'ለቡ'], zoneId: 'nifas-silk', x: 298.9, y: 395.3 },
+  { keywords: ['garment', 'ጋርመንት', 'hana mariam', 'ሃና ማርያም', 'ሀና ማርያም'], zoneId: 'nifas-silk', x: 291.9, y: 426.3 },
+
+  // Akaki-Kality
+  { keywords: ['saris', 'ሳሪስ', 'fafa', 'ፋፋ'], zoneId: 'akaki-kality', x: 381.2, y: 404.9 },
+  { keywords: ['saris abo', 'ሳሪስ አቦ', 'worku sefer', 'ወርቁ ሰፈር', '93 mazoria', '93 ማዞሪያ', 'cadisco', 'ካዲስኮ'], zoneId: 'akaki-kality', x: 395.3, y: 433.4 },
+  { keywords: ['kilinto', 'kln-', 'ቂሊንጦ', 'aastu', 'ሳይንስ እና ቴክኖሎጂ'], zoneId: 'akaki-kality', x: 480, y: 504.9 },
+  { keywords: ['kaliti', 'kality', 'kal ', 'kal-', 'ቃሊቲ', 'cheralia', 'ቼራሊያ', 'crown', 'ክራውን', 'kality prison', 'ቃሊቲ ማረሚያ'], zoneId: 'akaki-kality', x: 393, y: 521.5 },
+  { keywords: ['koye', 'koy-', 'ኮዬ'], zoneId: 'akaki-kality', x: 545.8, y: 543 },
+  { keywords: ['tulu dimtu', 'ቱሉ ዲምቱ'], zoneId: 'akaki-kality', x: 501.2, y: 550.1 },
+  { keywords: ['akaki', 'aka.', 'አቃቂ', 'coffee city', 'ኮፊ ሲቲ', 'beijing hospital', 'ቤጂንግ ሆስፒታል'], zoneId: 'akaki-kality', x: 428.3, y: 595.3 },
+  { keywords: ['gelan', 'gel-', 'ገላን', 'salo', 'ሳሎ'], zoneId: 'akaki-kality', x: 527, y: 623.9 },
 ];
 
 function resolveOutageAnchor(item: FeederInterruption, zone: SubCityZone): { x: number; y: number } {
-  const hay = `${item.affectedArea || ''} ${item.feederName || ''}`.toLowerCase();
+  const areaLower = (item.affectedArea || '').toLowerCase();
+  const feederLower = (item.feederName || '').toLowerCase();
+
+  let bestAnchor: { x: number; y: number } | null = null;
+  let bestScore = 0;
+
   for (const anchor of AREA_ANCHORS) {
-    if (anchor.zoneId === zone.id && anchor.keywords.some((kw) => hay.includes(kw))) {
-      return { x: anchor.x, y: anchor.y };
+    if (anchor.zoneId !== zone.id) continue;
+    let score = 0;
+    for (const kw of anchor.keywords) {
+      if (areaLower.includes(kw)) score += 3;
+      if (feederLower.includes(kw)) score += 2;
+    }
+    if (score > bestScore) {
+      bestScore = score;
+      bestAnchor = { x: anchor.x, y: anchor.y };
     }
   }
-  return { x: zone.center.x, y: zone.center.y };
+
+  return bestAnchor || { x: zone.center.x, y: zone.center.y };
 }
 
 function matchSubCityForOutage(item: FeederInterruption): SubCityZone | null {
