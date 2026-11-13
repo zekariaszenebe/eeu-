@@ -65,6 +65,7 @@ import EEULogo from './components/EEULogo';
 import WebLoginScreen from './components/WebLoginScreen';
 import FeedbackModal from './components/FeedbackModal';
 import { CloudSyncStatusModal } from './components/CloudSyncStatusModal';
+import AddisAbabaMapView from './components/AddisAbabaMapView';
 
 export default function App() {
   // 1. Theme State
@@ -621,6 +622,14 @@ export default function App() {
               Call Center Grid Board
             </button>
 
+            <button
+              id="mob-nav-map"
+              onClick={() => { setCurrentTab('map'); setMobileMenuOpen(false); }}
+              className={`w-full p-2.5 rounded-lg text-xs font-semibold flex items-center gap-2 ${currentTab === 'map' ? 'bg-eeu-green text-white' : 'text-gray-600 dark:text-gray-400'}`}
+            >
+              Map (Addis Ababa)
+            </button>
+
             {isAdmin && (
               <button
                 id="mob-nav-admin"
@@ -793,7 +802,7 @@ export default function App() {
             </div>
 
             {/* LIVE DATA STATISTICS ROW */}
-            {currentTab !== 'hub' && currentTab !== 'admin' && currentTab !== 'history' && currentTab !== 'contacts' && currentTab !== 'calculator' && currentTab !== 'smartmeter' && currentTab !== 'tariff' && currentTab !== 'sms-ticker' && <StatsGrid interruptions={interruptions} />}
+            {currentTab !== 'map' && currentTab !== 'hub' && currentTab !== 'admin' && currentTab !== 'history' && currentTab !== 'contacts' && currentTab !== 'calculator' && currentTab !== 'smartmeter' && currentTab !== 'tariff' && currentTab !== 'sms-ticker' && <StatsGrid interruptions={interruptions} />}
 
             {/* DETAILED VIEWS CONTAINER */}
             <div id="active-tab-container" className="pt-2 animate-in fade-in-40 duration-200">
@@ -803,6 +812,13 @@ export default function App() {
                   onTriggerMockIncident={handleTriggerMockIncident} 
                   isAdmin={isAdmin}
                   teamLeaderNotes={teamLeaderNotes}
+                />
+              )}
+
+              {currentTab === 'map' && (
+                <AddisAbabaMapView
+                  interruptions={interruptions}
+                  isDarkMode={isDarkMode}
                 />
               )}
 
