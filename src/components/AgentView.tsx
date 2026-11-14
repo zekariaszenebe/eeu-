@@ -8,7 +8,7 @@ import {
   Undo, Redo, Bold, Italic, Underline, Strikethrough, AlignLeft, AlignCenter, AlignRight, AlignJustify, Table, ChevronDown,
   Activity, Gauge, PowerOff, Server, Pin
 } from 'lucide-react';
-import { FeederInterruption, InterruptionType, InterruptionStatus, normalizeInterruptionType, stripBrackets, TeamLeaderNote, isPlannedOrOperational, isFeederRestored, isInfoFeeder } from '../types';
+import { FeederInterruption, InterruptionType, InterruptionStatus, normalizeInterruptionType, stripBrackets, TeamLeaderNote, isPlannedOrOperational, isFeederRestored, isInfoFeeder, getInterruptionCreatedOrderMs } from '../types';
 import { INITIAL_DISTRICTS } from '../data/mockData';
 import { INITIAL_FEEDERS_LIST } from '../data/feedersList';
 import { addTeamLeaderNoteDoc, updateTeamLeaderNoteDoc, deleteTeamLeaderNoteDoc } from '../lib/firestoreService';
@@ -729,11 +729,15 @@ export default function AgentView({ interruptions, onTriggerMockIncident, isAdmi
       return a.feederName.localeCompare(b.feederName);
     }
     
-    // Chronological comparison
+    // True chronological comparison (newest added on top; edits keep their position)
+    const timeA = getInterruptionCreatedOrderMs(a);
+    const timeB = getInterruptionCreatedOrderMs(b);
     if (sortBy === 'latest') {
-      return (b.lastUpdated || '').localeCompare(a.lastUpdated || '');
+      if (timeB !== timeA) return timeB - timeA;
+      return (b.id || '').localeCompare(a.id || '');
     } else {
-      return (a.lastUpdated || '').localeCompare(b.lastUpdated || '');
+      if (timeA !== timeB) return timeA - timeB;
+      return (a.id || '').localeCompare(b.id || '');
     }
   });
 

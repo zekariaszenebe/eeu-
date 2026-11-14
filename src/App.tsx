@@ -54,7 +54,6 @@ import Sidebar from './components/Sidebar';
 import StatsGrid from './components/StatsGrid';
 import AgentView from './components/AgentView';
 import AdminPanel from './components/AdminPanel';
-import ResolutionArchive from './components/ResolutionArchive';
 import BillCalculator from './components/BillCalculator';
 import SmartMeterCalculator from './components/SmartMeterCalculator';
 import EEUBillTariff from './components/EEUBillTariff';
@@ -802,7 +801,7 @@ export default function App() {
             </div>
 
             {/* LIVE DATA STATISTICS ROW */}
-            {currentTab !== 'map' && currentTab !== 'hub' && currentTab !== 'admin' && currentTab !== 'history' && currentTab !== 'contacts' && currentTab !== 'calculator' && currentTab !== 'smartmeter' && currentTab !== 'tariff' && currentTab !== 'sms-ticker' && <StatsGrid interruptions={interruptions} />}
+            {currentTab !== 'map' && currentTab !== 'hub' && currentTab !== 'admin' && currentTab !== 'contacts' && currentTab !== 'calculator' && currentTab !== 'smartmeter' && currentTab !== 'tariff' && currentTab !== 'sms-ticker' && <StatsGrid interruptions={interruptions} />}
 
             {/* DETAILED VIEWS CONTAINER */}
             <div id="active-tab-container" className="pt-2 animate-in fade-in-40 duration-200">

@@ -4,7 +4,7 @@ import {
   RefreshCw, Info, MapPin, Zap, Clock, ShieldCheck, HelpCircle, Download, Copy, Check, Building,
   UserCheck, Users, Eye, EyeOff, UserPlus, KeyRound, Shield, Search, Pin, CalendarClock, CheckCircle
 } from 'lucide-react';
-import { FeederInterruption, InterruptionType, InterruptionStatus, stripBrackets, TeamLeaderUser, UserRole, normalizeInterruptionType, isPlannedOrOperational, isFeederRestored, isInfoFeeder, isOutageFromToday } from '../types';
+import { FeederInterruption, InterruptionType, InterruptionStatus, stripBrackets, TeamLeaderUser, UserRole, normalizeInterruptionType, isPlannedOrOperational, isFeederRestored, isInfoFeeder, isOutageFromToday, getInterruptionCreatedOrderMs } from '../types';
 import { INITIAL_DISTRICTS, INITIAL_FEEDERS_LIST } from '../data/mockData';
 import { InterruptionTypeBadge, getCardinalDirection } from './AgentView';
 import { LanguageMode, translateAmharicLocation, formatLocationDisplay } from '../utils/locationLanguage';
@@ -714,17 +714,14 @@ export default function AdminPanel({
     );
   });
 
-  const { clearAllRestoredFeeders, resolveAllPreviousDayOutages, refreshAllData } = useInterruptions();
-  const [isClearingRestored, setIsClearingRestored] = useState(false);
+  const { resolveAllPreviousDayOutages, refreshAllData } = useInterruptions();
   const [isResolvingPrevious, setIsResolvingPrevious] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
 
-  const activeOutagesCount = interruptions.filter(i => !isFeederRestored(i)).length;
-  const restoredOutagesCount = interruptions.filter(i => isFeederRestored(i)).length;
   const previousDayOutagesCount = interruptions.filter(i => !isFeederRestored(i) && !isOutageFromToday(i.startTime)).length;
 
   const handleResolvePreviousDays = async () => {
-    if (window.confirm(`Mark all ${previousDayOutagesCount} previous day interruptions as Restored and move them to the archive?`)) {
+    if (window.confirm(`Mark all ${previousDayOutagesCount} previous day interruptions as Restored, clean them from the board, and forget them permanently?`)) {
       setIsResolvingPrevious(true);
       try {
         await resolveAllPreviousDayOutages();
@@ -734,18 +731,7 @@ export default function AdminPanel({
     }
   };
 
-  const handleClearRestoredClick = async () => {
-    if (window.confirm('Are you sure you want to permanently clear all restored feeder records from the database?')) {
-      setIsClearingRestored(true);
-      try {
-        await clearAllRestoredFeeders();
-      } finally {
-        setIsClearingRestored(false);
-      }
-    }
-  };
-
-  // Sort interruptions: Active disruptions only, with pinned INFO bulletins first
+  // Sort interruptions: Active disruptions only, with pinned INFO bulletins first, then newest-added on top (edits keep their place)
   const sortedInterruptions = [...interruptions]
     .filter(item => !isFeederRestored(item))
     .sort((a, b) => {
@@ -753,8 +739,9 @@ export default function AdminPanel({
       const bIsInfo = isInfoFeeder(b.feederName);
       if (aIsInfo && !bIsInfo) return -1;
       if (!aIsInfo && bIsInfo) return 1;
-      // Within active outages, sort by lastUpdated descending (newest first)
-      return (b.lastUpdated || '').localeCompare(a.lastUpdated || '');
+      const diff = getInterruptionCreatedOrderMs(b) - getInterruptionCreatedOrderMs(a);
+      if (diff !== 0) return diff;
+      return (b.id || '').localeCompare(a.id || '');
     });
 
   return (
@@ -924,7 +911,7 @@ export default function AdminPanel({
                     {previousDayOutagesCount} Active Feeder Disruption(s) from Previous Days
                   </h4>
                   <p className="text-[11px] text-amber-700/90 dark:text-amber-400/90 mt-0.5">
-                    These interruptions were logged on earlier shifts and remain marked Active in the database. If power was already restored in the field, click below to mark them Restored and clear today's live board.
+                    These interruptions were logged on earlier shifts and remain marked Active in the database. If power was already restored in the field, click below to clean and permanently forget them from the live board.
                   </p>
                 </div>
               </div>
@@ -935,7 +922,7 @@ export default function AdminPanel({
                 className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer shrink-0 disabled:opacity-50"
               >
                 <CheckCircle className="w-3.5 h-3.5" />
-                <span>{isResolvingPrevious ? 'Archiving...' : `Archive All Previous Days (${previousDayOutagesCount})`}</span>
+                <span>{isResolvingPrevious ? 'Cleaning...' : `Clear Previous Days (${previousDayOutagesCount})`}</span>
               </button>
             </div>
           )}
@@ -949,18 +936,6 @@ export default function AdminPanel({
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
-            {restoredOutagesCount > 0 && (
-              <button
-                type="button"
-                onClick={handleClearRestoredClick}
-                disabled={isClearingRestored}
-                className="px-3 py-1 text-xs font-semibold text-red-600 hover:text-red-700 bg-red-500/10 hover:bg-red-500/20 border border-red-200 dark:border-red-900/40 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                title="Permanently remove all restored records"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                <span>{isClearingRestored ? 'Clearing...' : `Clear Restored (${restoredOutagesCount})`}</span>
-              </button>
-            )}
 
             <span className="text-[10px] font-sans font-bold text-emerald-650 bg-emerald-500/10 dark:bg-emerald-950/30 px-2 py-0.5 rounded border border-emerald-500/25">
               Admin: Write Access Active
@@ -1084,44 +1059,27 @@ export default function AdminPanel({
                       {/* Action buttons */}
                       <td className="py-4 px-5 text-right whitespace-nowrap">
                         <div className="flex items-center justify-end gap-1.5">
-                          {!isRestored && (
-                            <button
-                              id={`admin-resolve-btn-${item.id}`}
-                              onClick={() => handleQuickResolve(item)}
-                              disabled={resolvingId === item.id}
-                              title="Mark as Restored"
-                              className="p-2 text-eeu-green hover:bg-eeu-green/10 rounded-lg transition-all disabled:opacity-50"
-                            >
-                              {resolvingId === item.id ? (
-                                <RefreshCw className="w-4 h-4 animate-spin text-eeu-green" />
-                              ) : (
-                                <CheckCircle2 className="w-4 h-4" />
-                              )}
-                            </button>
-                          )}
+                          <button
+                            id={`admin-resolve-btn-${item.id}`}
+                            onClick={() => handleQuickResolve(item)}
+                            disabled={resolvingId === item.id}
+                            title="Mark as Restored (Clean & Forget)"
+                            className="p-2 text-eeu-green hover:bg-eeu-green/10 rounded-lg transition-all disabled:opacity-50 cursor-pointer"
+                          >
+                            {resolvingId === item.id ? (
+                              <RefreshCw className="w-4 h-4 animate-spin text-eeu-green" />
+                            ) : (
+                              <CheckCircle2 className="w-4 h-4" />
+                            )}
+                          </button>
                           
                           <button
                             id={`admin-edit-btn-${item.id}`}
                             onClick={() => handleOpenEditForm(item)}
                             title="Edit Interruption Info"
-                            className="p-2 text-blue-650 hover:bg-blue-500/10 dark:text-blue-400 rounded-lg transition-all"
+                            className="p-2 text-blue-650 hover:bg-blue-500/10 dark:text-blue-400 rounded-lg transition-all cursor-pointer"
                           >
                             <Edit3 className="w-4 h-4" />
-                          </button>
-                          
-                          <button
-                            id={`admin-delete-btn-${item.id}`}
-                            onClick={() => {
-                              setDeleteConfirm({
-                                idOrStr: item.id,
-                                name: item.feederName,
-                                type: 'interruption'
-                              });
-                            }}
-                            title="Delete Record"
-                            className="p-2 text-red-500 hover:bg-red-500/10 rounded-lg transition-all cursor-pointer"
-                          >
-                            <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
                       </td>
@@ -2142,9 +2100,7 @@ export default function AdminPanel({
                 id="delete-confirm-btn"
                 type="button"
                 onClick={() => {
-                  if (deleteConfirm.type === 'interruption') {
-                    onDeleteInterruption(deleteConfirm.idOrStr);
-                  } else if (deleteConfirm.type === 'feeder') {
+                  if (deleteConfirm.type === 'feeder') {
                     if (canEditFeeders) {
                       handleDeleteFeeder(deleteConfirm.idOrStr);
                     }

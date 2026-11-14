@@ -101,6 +101,34 @@ export interface FeederInterruption {
   affectedArea: string;
   remark: string;
   lastUpdated: string;
+  createdAtMs?: number;
+}
+
+/**
+ * Returns a reliable chronological creation timestamp (ms) so newly added interruptions
+ * always stay at the top even across 12 PM -> 1 PM or AM -> PM boundaries, and edits keep their original position.
+ */
+export function getInterruptionCreatedOrderMs(
+  item: Pick<FeederInterruption, 'id' | 'createdAtMs' | 'startTime' | 'lastUpdated'>
+): number {
+  if (typeof item.createdAtMs === 'number' && Number.isFinite(item.createdAtMs) && item.createdAtMs > 0) {
+    return item.createdAtMs;
+  }
+  const idMatch = typeof item.id === 'string' ? item.id.match(/^f-(\d{12,})/) : null;
+  if (idMatch) {
+    const parsedIdMs = Number(idMatch[1]);
+    if (Number.isFinite(parsedIdMs) && parsedIdMs > 0) {
+      return parsedIdMs;
+    }
+  }
+  const parseDisplayTime = (raw?: string): number => {
+    if (!raw || typeof raw !== 'string') return 0;
+    const direct = Date.parse(raw);
+    if (!Number.isNaN(direct)) return direct;
+    const withYear = Date.parse(`${raw} ${new Date().getFullYear()}`);
+    return Number.isNaN(withYear) ? 0 : withYear;
+  };
+  return parseDisplayTime(item.startTime) || parseDisplayTime(item.lastUpdated) || 0;
 }
 
 export interface SystemStats {

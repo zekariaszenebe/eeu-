@@ -1,15 +1,15 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { FeederInterruption, InterruptionStatus, normalizeInterruptionType, isFeederRestored, isOutageFromToday } from '../types';
+import { FeederInterruption, InterruptionStatus, normalizeInterruptionType, isFeederRestored, isOutageFromToday, getInterruptionCreatedOrderMs } from '../types';
 import { getCardinalDirection } from '../utils/direction';
 import { 
   addInterruptionDoc, 
   updateInterruptionDoc, 
   deleteInterruptionDoc, 
+  forgetInterruptionsByIdsDoc,
   subscribeToInterruptions, 
   fetchLatestInterruptions, 
   cleanOutagesList, 
   clearAllRestoredInterruptionsDoc, 
-  recordDeletedInterruptionId, 
   subscribeCloudStatus, 
   probeFirestoreConnection, 
   isFirestoreQuotaExhausted 
@@ -95,7 +95,7 @@ export const InterruptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
   // Fetch fresh cloud data immediately upon mount to bypass stale local cache
   useEffect(() => {
     fetchLatestInterruptions().then(fresh => {
-      if (fresh && fresh.length > 0) {
+      if (Array.isArray(fresh)) {
         setInterruptions(fresh);
         try {
           localStorage.setItem('eeu-interruptions', JSON.stringify(fresh));
@@ -117,7 +117,6 @@ export const InterruptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     const handleMessage = (event: MessageEvent) => {
       const { type, data } = event.data || {};
       if (type === 'DELETE_INTERRUPTION' && data && data.id) {
-        recordDeletedInterruptionId(data.id);
         setInterruptions(prev => {
           const next = prev.filter(i => i.id !== data.id);
           try { localStorage.setItem('eeu-interruptions', JSON.stringify(next)); } catch {}
@@ -202,7 +201,7 @@ export const InterruptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
       setIsDocumentVisible(visible);
       if (visible) {
         fetchLatestInterruptions().then(fresh => {
-          if (fresh && fresh.length > 0) {
+          if (Array.isArray(fresh)) {
             setInterruptions(prev => {
               if (JSON.stringify(prev) === JSON.stringify(fresh)) return prev;
               try { localStorage.setItem('eeu-interruptions', JSON.stringify(fresh)); } catch {}
@@ -238,26 +237,6 @@ export const InterruptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     };
   }, [isLeaderTab, isDocumentVisible]);
 
-
-
-
-  // Keep active local state clean and bounded
-  useEffect(() => {
-    const restored = interruptions.filter(item => item && item.status === InterruptionStatus.RESTORED);
-    if (restored.length > 30) {
-      const sortedRestored = [...restored].sort((a, b) => (b.lastUpdated || '').localeCompare(a.lastUpdated || ''));
-      const excessIds = new Set(sortedRestored.slice(30).map(item => item.id));
-      setInterruptions(prev => {
-        const next = prev.filter(item => !excessIds.has(item.id));
-        try {
-          localStorage.setItem('eeu-interruptions', JSON.stringify(next));
-        } catch (e) {}
-        channel?.postMessage({ type: 'SYNC_INTERRUPTIONS', data: next });
-        return next;
-      });
-    }
-  }, [interruptions]);
-
   // Storage event listener to sync across tabs if broadcast channel is inactive
   useEffect(() => {
     const handleStorageChange = (e: StorageEvent) => {
@@ -280,8 +259,9 @@ export const InterruptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
   // Create interruption with local persistence & truthful sync feedback
   const addInterruption = async (entry: Omit<FeederInterruption, 'id' | 'lastUpdated'>) => {
-    const tempId = `f-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
-    const timestampStr = new Date().toLocaleString('en-US', {
+    const nowMs = Date.now();
+    const tempId = `f-${nowMs}-${Math.random().toString(36).substring(2, 7)}`;
+    const timestampStr = new Date(nowMs).toLocaleString('en-US', {
       month: 'short',
       day: 'numeric',
       hour: '2-digit',
@@ -300,7 +280,8 @@ export const InterruptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
       estimatedRestorationTime: entry.estimatedRestorationTime,
       affectedArea: entry.affectedArea,
       remark: entry.remark,
-      lastUpdated: timestampStr
+      lastUpdated: timestampStr,
+      createdAtMs: nowMs
     };
 
     setInterruptions(prev => {
@@ -315,6 +296,10 @@ export const InterruptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     try {
       const result = await addInterruptionDoc(entry, tempId);
       if (result.syncedToCloud) {
+        if (Array.isArray(result.outages)) {
+          setInterruptions(result.outages);
+          channel?.postMessage({ type: 'SYNC_INTERRUPTIONS', data: result.outages });
+        }
         triggerToast('New Outage Added & Synced', `${entry.feederName} synchronized across all call center terminals`, 'success');
       } else if (result.quotaExhausted) {
         triggerToast('Saved in Local Browser Only', `${entry.feederName} stored locally. Firebase free tier daily quota is currently reached, so other terminals cannot pull it yet.`, 'warn');
@@ -329,6 +314,11 @@ export const InterruptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
   // Update interruption with local persistence & quota-aware feedback
   const updateInterruption = async (id: string, entry: Partial<FeederInterruption>) => {
+    if (entry.status && entry.status === InterruptionStatus.RESTORED) {
+      await deleteInterruption(id);
+      return;
+    }
+
     let existing: FeederInterruption | undefined;
 
     setInterruptions(prev => {
@@ -348,7 +338,8 @@ export const InterruptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
         ...entry,
         type: entry.type ? normalizeInterruptionType(entry.type) : existing.type,
         direction: entry.direction || existing.direction || getCardinalDirection(entry.district || existing.district, entry.feederName || existing.feederName),
-        lastUpdated: timestampStr
+        lastUpdated: timestampStr,
+        createdAtMs: getInterruptionCreatedOrderMs(existing)
       };
 
       const nextList = prev.map(item => item.id === id ? updatedRecord : item);
@@ -363,18 +354,17 @@ export const InterruptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
     // Zero-latency UI toast feedback
     if (entry.status && entry.status !== existing.status) {
-      const titleText = entry.status === InterruptionStatus.RESTORED ? 'Feeder Line Cleared' : 'Operational Status Changed';
-      const messageText = entry.status === InterruptionStatus.RESTORED 
-        ? `${existing.feederName} restored to active grid status and re-energized successfully.`
-        : `${existing.feederName} reassessed as ${entry.status}.`;
-      triggerToast(titleText, messageText, entry.status === InterruptionStatus.RESTORED ? 'success' : 'info');
+      triggerToast('Operational Status Changed', `${existing.feederName} reassessed as ${entry.status}.`, 'info');
     } else {
       triggerToast('Record Updated', `Successfully updated grid data for ${existing.feederName}`, 'success');
     }
 
     try {
       const res = await updateInterruptionDoc(id, entry, existing);
-      if (res && res.quotaExhausted) {
+      if (res && res.syncedToCloud && Array.isArray(res.outages)) {
+        setInterruptions(res.outages);
+        channel?.postMessage({ type: 'SYNC_INTERRUPTIONS', data: res.outages });
+      } else if (res && res.quotaExhausted) {
         triggerToast('Saved Locally (Quota Reached)', `${existing.feederName} updated locally. Firebase cloud quota limit reached.`, 'warn');
       }
     } catch (e) {
@@ -382,10 +372,9 @@ export const InterruptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }
   };
 
-  // Delete interruption with permanent tombstone and instant broadcast
+  // Delete / clean & forget interruption atomically via Firestore transaction
   const deleteInterruption = async (id: string) => {
     let target: FeederInterruption | undefined;
-    recordDeletedInterruptionId(id);
 
     setInterruptions(prev => {
       target = prev.find(i => i.id === id);
@@ -400,17 +389,21 @@ export const InterruptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
     try {
       const res = await deleteInterruptionDoc(id);
+      if (res && res.syncedToCloud && Array.isArray(res.outages)) {
+        setInterruptions(res.outages);
+        channel?.postMessage({ type: 'SYNC_INTERRUPTIONS', data: res.outages });
+      }
       if (target) {
         if (res && res.quotaExhausted) {
-          triggerToast('Deleted Locally (Quota Reached)', `${target.feederName} cleared locally. Firebase cloud quota limit reached.`, 'warn');
+          triggerToast('Cleared Locally (Quota Reached)', `${target.feederName} restored & forgotten locally. Firebase cloud quota limit reached.`, 'warn');
         } else {
-          triggerToast('Record Removed', `${target.feederName} interruption permanently cleared.`, 'info');
+          triggerToast('Feeder Restored & Forgotten', `${target.feederName} cleaned from the live board and forgotten permanently.`, 'success');
         }
       }
     } catch (e) {
       console.error('Firestore deleteInterruptionDoc failed, keeping deletion locally:', e);
       if (target) {
-        triggerToast('Deleted Locally', `${target.feederName} removed locally.`, 'info');
+        triggerToast('Cleared Locally', `${target.feederName} cleaned locally.`, 'info');
       }
     }
   };
@@ -478,26 +471,45 @@ export const InterruptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
   const resolveAllPreviousDayOutages = async () => {
     try {
-      const targets = interruptions.filter(i => !isFeederRestored(i) && !isOutageFromToday(i.startTime));
+      const targets = interruptions.filter(i => !isOutageFromToday(i.startTime));
       if (targets.length === 0) {
         triggerToast('No Previous Day Outages', 'All active feeder interruptions are from today.', 'info');
         return;
       }
-      for (const item of targets) {
-        await updateInterruption(item.id, { status: InterruptionStatus.RESTORED });
+      const targetIds = targets.map(t => t.id);
+      const targetIdSet = new Set(targetIds);
+
+      setInterruptions(prev => {
+        const nextList = prev.filter(i => !targetIdSet.has(i.id));
+        try {
+          localStorage.setItem('eeu-interruptions', JSON.stringify(nextList));
+        } catch {}
+        channel?.postMessage({ type: 'SYNC_INTERRUPTIONS', data: nextList });
+        return nextList;
+      });
+
+      const res = await forgetInterruptionsByIdsDoc(targetIds);
+      if (res.syncedToCloud && Array.isArray(res.outages)) {
+        setInterruptions(res.outages);
+        channel?.postMessage({ type: 'SYNC_INTERRUPTIONS', data: res.outages });
       }
-      triggerToast('Previous Outages Resolved', `Marked ${targets.length} previous day interruptions as Restored.`, 'success');
+      if (res.quotaExhausted) {
+        triggerToast('Cleared Locally (Quota Reached)', `Cleaned and forgot ${targets.length} previous day feeders locally.`, 'warn');
+      } else {
+        triggerToast('Previous Outages Cleared', `Cleaned and permanently forgot ${targets.length} previous day interruptions.`, 'success');
+      }
     } catch (e) {
-      console.error('Failed to resolve previous day outages:', e);
-      triggerToast('Action Failed', 'Could not resolve previous day interruptions.', 'warn');
+      console.error('Failed to clean previous day outages:', e);
+      triggerToast('Action Failed', 'Could not clear previous day interruptions.', 'warn');
     }
   };
 
   const refreshAllData = async () => {
     try {
       const fresh = await fetchLatestInterruptions();
-      if (fresh && fresh.length > 0) {
+      if (Array.isArray(fresh)) {
         setInterruptions(fresh);
+        channel?.postMessage({ type: 'SYNC_INTERRUPTIONS', data: fresh });
         triggerToast('Data Refreshed', `Synchronized ${fresh.length} interruptions from cloud server.`, 'success');
       } else {
         triggerToast('Up to Date', 'Already displaying the latest interruption state.', 'info');
