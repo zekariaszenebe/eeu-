@@ -45,14 +45,14 @@ export default function Sidebar({
 
   const navItems: NavItem[] = [
     { id: 'dashboard', name: 'Interruption Dashboard', icon: LayoutDashboard },
-    { id: 'map', name: 'Map', icon: MapIcon },
     ...(canManageFeed ? [{ id: 'admin', name: feedTabName, icon: ShieldAlert }] : []),
     { id: 'sms-ticker', name: 'SMS Ticket Generator', icon: MessageSquare },
     { id: 'calculator', name: 'Bill Calculator', icon: Calculator },
     { id: 'smartmeter', name: 'Smart Meter Calculator', icon: Gauge },
     { id: 'tariff', name: 'EEU Bill Tarrif', icon: FileSpreadsheet },
     { id: 'hub', name: 'CSC Address', icon: MapPin },
-    { id: 'contacts', name: 'Other Region Phone NO', icon: Phone }
+    { id: 'contacts', name: 'Other Region Phone NO', icon: Phone },
+    { id: 'map', name: 'Map', icon: MapIcon }
   ];
 
   return (
