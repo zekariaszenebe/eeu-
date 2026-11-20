@@ -503,7 +503,6 @@ export default function WebLoginScreen({ onLoginSuccess, teamLeaders = [] }: Web
               <ul className="list-disc pl-4 space-y-1 text-gray-600 dark:text-gray-300">
                 <li>Contact your Team Leader or Shift Supervisor.</li>
                 <li>System Administrators can generate a new temporary passcode.</li>
-                <li>Call internal hotline <strong>905</strong> for emergency reset.</li>
               </ul>
             </div>
             <div className="mt-5 flex justify-end">
